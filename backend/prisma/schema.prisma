@@ -33,3 +33,44 @@ model User {
   role       UserRole  @default(COMMERCIAL)
   createdAt  DateTime  @default(now())
 }
+
+model Vehicle {
+  id String @id @default(cuid())
+
+  licensePlate String @unique
+
+  type VehicleType
+
+  sanitaryApprovalNo String?
+  sanitaryExpiryDate DateTime?
+
+  technicalControlDate DateTime?
+  nextTechnicalControl DateTime?
+
+  insurancePolicyNo String?
+  insuranceCompany String?
+  insuranceExpiryDate DateTime?
+
+  medicalEquipment String?
+  mileage Int?
+  maintenancePlan String?
+
+  status VehicleStatus @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum VehicleType {
+  AMBULANCE
+  VSL
+  TPMR
+  MEDICAL_MOTORBIKE
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_SERVICE
+  IN_MAINTENANCE
+  OUT_OF_SERVICE
+}
