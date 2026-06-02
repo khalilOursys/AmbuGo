@@ -122,12 +122,7 @@ export default function UsersPage() {
       size: 150,
       Cell: ({ cell }) => cell.getValue<string>() || "-",
     },
-    {
-      accessorKey: "cin",
-      header: "CIN",
-      size: 120,
-      Cell: ({ cell }) => cell.getValue<string>() || "-",
-    },
+
     {
       accessorKey: "role",
       header: "Role",
@@ -137,8 +132,8 @@ export default function UsersPage() {
         return (
           <span
             className={`px-2 py-1 rounded-full text-xs font-medium ${role === "ADMIN"
-                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
-                : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+              ? "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300"
+              : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
               }`}
           >
             {role}
@@ -146,12 +141,7 @@ export default function UsersPage() {
         );
       },
     },
-    {
-      accessorKey: "createdAt",
-      header: "Created At",
-      size: 150,
-      Cell: ({ cell }) => new Date(cell.getValue<string>()).toLocaleDateString(),
-    },
+
     {
       id: "actions",
       header: "Actions",

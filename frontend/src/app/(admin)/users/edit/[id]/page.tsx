@@ -316,7 +316,7 @@ function EditUserContent({ id }: { id: string }) {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-md bg-primary px-6 py-3 font-medium text-white hover:bg-opacity-90 transition-colors flex items-center gap-2"
+                  className="rounded-md border border-stroke px-6 py-3 font-medium hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
                 >
                   {isSubmitting ? (
                     <>
@@ -325,7 +325,7 @@ function EditUserContent({ id }: { id: string }) {
                     </>
                   ) : (
                     <>
-                      <Save className="w-5 h-5" />
+                      {/* <Save className="w-5 h-5" /> */}
                       Update User
                     </>
                   )}
@@ -339,8 +339,8 @@ function EditUserContent({ id }: { id: string }) {
           open={toastOpen}
           onOpenChange={setToastOpen}
           className={`fixed top-20 right-4 w-80 rounded-md p-4 shadow-lg z-50 ${toastType === "success"
-              ? "bg-green-600 dark:bg-green-700 text-white"
-              : "bg-red-600 dark:bg-red-700 text-white"
+            ? "bg-green-600 dark:bg-green-700 text-white"
+            : "bg-red-600 dark:bg-red-700 text-white"
             }`}
           duration={3000}
         >
