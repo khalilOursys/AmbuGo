@@ -4,6 +4,7 @@ import "flatpickr/dist/flatpickr.css";
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { Providers } from './providers';
+import "react-datepicker/dist/react-datepicker.css";
 
 const outfit = Outfit({
   subsets: ["latin"],

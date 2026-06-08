@@ -25,6 +25,8 @@ async function bootstrap() {
       'https://oralwave.tn',
       'https://admin.oralwave.tn',
       'http://localhost:3000',
+      'http://10.188.3.41:3000',
+      'http://192.168.1.11:3000',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: ['Content-Type', 'Authorization'],

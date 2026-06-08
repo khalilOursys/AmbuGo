@@ -1,21 +1,26 @@
 import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
   IsString,
-  IsInt,
+  IsEnum,
+  IsOptional,
+  IsNumber,
   IsDateString,
 } from 'class-validator';
-
 import { VehicleType, VehicleStatus } from '@prisma/client';
 
 export class CreateVehicleDto {
   @IsString()
-  @IsNotEmpty()
   licensePlate: string;
 
   @IsEnum(VehicleType)
   type: VehicleType;
+
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
 
   @IsOptional()
   @IsString()
@@ -50,7 +55,7 @@ export class CreateVehicleDto {
   medicalEquipment?: string;
 
   @IsOptional()
-  @IsInt()
+  @IsNumber()
   mileage?: number;
 
   @IsOptional()

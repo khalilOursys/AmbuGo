@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
+import { TruckIcon } from "lucide-react";
 import {
   BoxCubeIcon,
   HorizontaLDots,
@@ -22,6 +23,11 @@ const navItems: NavItem[] = [
     name: "Users",
     icon: <UsersIcon />,
     path: "/users",
+  },
+  {
+    name: "Vehicles",
+    icon: <TruckIcon />,
+    path: "/vehicles",
   },
 ];
 

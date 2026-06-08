@@ -15,29 +15,61 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  COMMERCIAL
+  DISPATCHER
+  SUPERVISOR
+  DRIVER
+  PARAMEDIC
+  DOCTOR
 }
+
+enum VehicleType {
+  AMBULANCE
+  VSL
+  TPMR
+  MEDICAL_MOTORBIKE
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ASSIGNED
+  ON_MISSION
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
 
 //////////////////////////////////////
 // BASE MODELS
 //////////////////////////////////////
 
+
 model User {
-  id         String    @id @default(uuid()) 
+  id         String    @id @default(uuid())
+
   email      String    @unique
   password   String
+
+  firstName  String
+  lastName   String
+
   telephone  String?
-  firstName  String?
-  lastName   String?
-  cin        String?
-  role       UserRole  @default(COMMERCIAL)
+  cin        String?   @unique
+
+  role       UserRole  @default(DRIVER)
+
+  active     Boolean   @default(true)
+
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Vehicle {
   id String @id @default(cuid())
 
   licensePlate String @unique
+
+  brand String?
+  model String?
 
   type VehicleType
 
@@ -52,25 +84,13 @@ model Vehicle {
   insuranceExpiryDate DateTime?
 
   medicalEquipment String?
+
   mileage Int?
+
   maintenancePlan String?
 
   status VehicleStatus @default(AVAILABLE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-enum VehicleType {
-  AMBULANCE
-  VSL
-  TPMR
-  MEDICAL_MOTORBIKE
-}
-
-enum VehicleStatus {
-  AVAILABLE
-  IN_SERVICE
-  IN_MAINTENANCE
-  OUT_OF_SERVICE
 }

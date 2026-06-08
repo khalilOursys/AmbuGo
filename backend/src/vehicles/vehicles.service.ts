@@ -9,40 +9,44 @@ export class VehiclesService {
   constructor(private prisma: PrismaService) {}
 
   // ---------------- CREATE ----------------
-  async create(dto: CreateVehicleDto) {
-    return this.prisma.vehicle.create({
-      data: {
-        licensePlate: dto.licensePlate,
-        type: dto.type,
+ async create(createVehicleDto: CreateVehicleDto) {
+  return this.prisma.vehicle.create({
+    data: {
+      licensePlate: createVehicleDto.licensePlate,
+      type: createVehicleDto.type,
 
-        sanitaryApprovalNo: dto.sanitaryApprovalNo ?? undefined,
-        sanitaryExpiryDate: dto.sanitaryExpiryDate
-          ? new Date(dto.sanitaryExpiryDate)
-          : undefined,
+      brand: createVehicleDto.brand,
+      model: createVehicleDto.model,
 
-        technicalControlDate: dto.technicalControlDate
-          ? new Date(dto.technicalControlDate)
-          : undefined,
+      sanitaryApprovalNo: createVehicleDto.sanitaryApprovalNo,
+      sanitaryExpiryDate: createVehicleDto.sanitaryExpiryDate
+        ? new Date(createVehicleDto.sanitaryExpiryDate)
+        : null,
 
-        nextTechnicalControl: dto.nextTechnicalControl
-          ? new Date(dto.nextTechnicalControl)
-          : undefined,
+      technicalControlDate: createVehicleDto.technicalControlDate
+        ? new Date(createVehicleDto.technicalControlDate)
+        : null,
 
-        insurancePolicyNo: dto.insurancePolicyNo ?? undefined,
-        insuranceCompany: dto.insuranceCompany ?? undefined,
+      nextTechnicalControl: createVehicleDto.nextTechnicalControl
+        ? new Date(createVehicleDto.nextTechnicalControl)
+        : null,
 
-        insuranceExpiryDate: dto.insuranceExpiryDate
-          ? new Date(dto.insuranceExpiryDate)
-          : undefined,
+      insurancePolicyNo: createVehicleDto.insurancePolicyNo,
+      insuranceCompany: createVehicleDto.insuranceCompany,
+      insuranceExpiryDate: createVehicleDto.insuranceExpiryDate
+        ? new Date(createVehicleDto.insuranceExpiryDate)
+        : null,
 
-        medicalEquipment: dto.medicalEquipment ?? undefined,
-        mileage: dto.mileage ?? undefined,
-        maintenancePlan: dto.maintenancePlan ?? undefined,
+      medicalEquipment: createVehicleDto.medicalEquipment,
 
-        status: dto.status ?? VehicleStatus.AVAILABLE,
-      },
-    });
-  }
+      mileage: createVehicleDto.mileage ?? null,
+
+      maintenancePlan: createVehicleDto.maintenancePlan,
+
+      status: createVehicleDto.status ?? 'AVAILABLE',
+    },
+  });
+}
 
   // ---------------- FIND ALL ----------------
   async findAll() {
@@ -65,61 +69,76 @@ export class VehiclesService {
   }
 
   // ---------------- UPDATE ----------------
-  async update(id: string, dto: UpdateVehicleDto) {
-    await this.findOne(id);
+ async update(id: string, dto: UpdateVehicleDto) {
+  await this.findOne(id);
 
-    return this.prisma.vehicle.update({
-      where: { id },
-      data: {
-        ...(dto.licensePlate && { licensePlate: dto.licensePlate }),
-        ...(dto.type && { type: dto.type }),
+  const data: any = {};
 
-        ...(dto.sanitaryApprovalNo !== undefined && {
-          sanitaryApprovalNo: dto.sanitaryApprovalNo,
-        }),
-
-        ...(dto.sanitaryExpiryDate && {
-          sanitaryExpiryDate: new Date(dto.sanitaryExpiryDate),
-        }),
-
-        ...(dto.technicalControlDate && {
-          technicalControlDate: new Date(dto.technicalControlDate),
-        }),
-
-        ...(dto.nextTechnicalControl && {
-          nextTechnicalControl: new Date(dto.nextTechnicalControl),
-        }),
-
-        ...(dto.insurancePolicyNo !== undefined && {
-          insurancePolicyNo: dto.insurancePolicyNo,
-        }),
-
-        ...(dto.insuranceCompany !== undefined && {
-          insuranceCompany: dto.insuranceCompany,
-        }),
-
-        ...(dto.insuranceExpiryDate && {
-          insuranceExpiryDate: new Date(dto.insuranceExpiryDate),
-        }),
-
-        ...(dto.medicalEquipment !== undefined && {
-          medicalEquipment: dto.medicalEquipment,
-        }),
-
-        ...(dto.mileage !== undefined && {
-          mileage: dto.mileage,
-        }),
-
-        ...(dto.maintenancePlan !== undefined && {
-          maintenancePlan: dto.maintenancePlan,
-        }),
-
-        ...(dto.status && {
-          status: dto.status,
-        }),
-      },
-    });
+  if (dto.licensePlate !== undefined) {
+    data.licensePlate = dto.licensePlate;
   }
+
+  if (dto.type !== undefined) {
+    data.type = dto.type;
+  }
+
+  if (dto.brand !== undefined) {
+    data.brand = dto.brand;
+  }
+
+  if (dto.model !== undefined) {
+    data.model = dto.model;
+  }
+
+  if (dto.sanitaryApprovalNo !== undefined) {
+    data.sanitaryApprovalNo = dto.sanitaryApprovalNo;
+  }
+
+  if (dto.sanitaryExpiryDate !== undefined) {
+    data.sanitaryExpiryDate = new Date(dto.sanitaryExpiryDate);
+  }
+
+  if (dto.technicalControlDate !== undefined) {
+    data.technicalControlDate = new Date(dto.technicalControlDate);
+  }
+
+  if (dto.nextTechnicalControl !== undefined) {
+    data.nextTechnicalControl = new Date(dto.nextTechnicalControl);
+  }
+
+  if (dto.insurancePolicyNo !== undefined) {
+    data.insurancePolicyNo = dto.insurancePolicyNo;
+  }
+
+  if (dto.insuranceCompany !== undefined) {
+    data.insuranceCompany = dto.insuranceCompany;
+  }
+
+  if (dto.insuranceExpiryDate !== undefined) {
+    data.insuranceExpiryDate = new Date(dto.insuranceExpiryDate);
+  }
+
+  if (dto.medicalEquipment !== undefined) {
+    data.medicalEquipment = dto.medicalEquipment;
+  }
+
+  if (dto.mileage !== undefined) {
+    data.mileage = dto.mileage;
+  }
+
+  if (dto.maintenancePlan !== undefined) {
+    data.maintenancePlan = dto.maintenancePlan;
+  }
+
+  if (dto.status !== undefined) {
+    data.status = dto.status;
+  }
+
+  return this.prisma.vehicle.update({
+    where: { id },
+    data,
+  });
+}
 
   // ---------------- DELETE ----------------
   async remove(id: string) {
