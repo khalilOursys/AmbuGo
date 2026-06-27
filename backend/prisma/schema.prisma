@@ -1,5 +1,4 @@
-// prisma/schema.prisma
-
+// ===================== GENERATORS =====================
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,27 +8,692 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//////////////////////////////////////
-// ENUMS
-//////////////////////////////////////
-
+// ===================== ENUMS =====================
 enum UserRole {
   ADMIN
-  COMMERCIAL
+  DISPATCHER
+  SUPERVISOR
+  MANAGER
 }
 
-//////////////////////////////////////
-// BASE MODELS
-//////////////////////////////////////
+enum MissionStatus {
+  CREATED
+  ASSIGNED
+  DISPATCHED
+  EN_ROUTE
+  ON_SCENE
+  TRANSPORTING
+  ARRIVED_HOSPITAL
+  COMPLETED
+  CANCELLED
+}
 
+enum MissionPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ASSIGNED
+  BUSY
+  MAINTENANCE
+  OFFLINE
+}
+
+enum StaffType {
+  DRIVER
+  PARAMEDIC
+  NURSE
+  DOCTOR
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  CANCELLED
+}
+
+enum PricingType {
+  FIXED
+  PER_KM
+  DISTANCE_RANGE
+}
+
+enum AmbulanceLevel {
+  BLS   // Basic Life Support - 2 staff
+  ALS   // Advanced Life Support - 3 staff  
+  ICU   // Mobile ICU - 4+ staff
+}
+
+// ===================== COMPANY =====================
+model Company {
+  id               String @id @default(uuid())
+
+  name             String @unique
+
+  address          String?
+
+  latitude         Float?
+  longitude        Float?
+
+  radiusKm         Float @default(10)
+
+  pricingType      PricingType @default(FIXED)
+
+  baseCurrency     String @default("TND")
+
+  rib              String?
+  matriculeFiscale String?
+
+  email            String?
+  phone            String?
+
+  logoId           String? @unique
+  logo             File? @relation(fields: [logoId], references: [id])
+
+  users            User[]
+  services         Service[]
+  equipment        Equipment[]
+  distanceRates    DistanceRate[]
+  customers        Customer[]
+  vehicles         Vehicle[]
+  staff            StaffMember[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([name])
+  @@index([isDeleted])
+}
+
+// ===================== USERS =====================
 model User {
-  id         String    @id @default(uuid()) 
-  email      String    @unique
-  password   String
+  id         String   @id @default(uuid())
+
+  email      String   @unique
+  password   String?
   telephone  String?
   firstName  String?
   lastName   String?
   cin        String?
-  role       UserRole  @default(COMMERCIAL)
-  createdAt  DateTime  @default(now())
+
+  role       UserRole @default(MANAGER)
+
+  companyId  String?
+  company    Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  auditLogs  AuditLog[]
+  notifications Notification[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([email])
+  @@index([companyId])
+}
+
+// ===================== CUSTOMER =====================
+model Customer {
+  id          String @id @default(uuid())
+
+  code        String? @unique
+  name        String
+
+  phone       String?
+  email       String?
+  address     String?
+
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  contracts   Contract[]
+  missions    Mission[]
+  invoices    Invoice[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([name])
+  @@index([companyId])
+}
+
+// ===================== CONTRACT =====================
+model Contract {
+  id          String @id @default(uuid())
+
+  reference   String @unique
+  title       String
+
+  startDate   DateTime
+  endDate     DateTime?
+
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  missions    Mission[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([reference])
+  @@index([customerId])
+  @@index([startDate])
+}
+
+// ===================== PATIENT =====================
+model Patient {
+  id          String @id @default(uuid())
+
+  firstname   String
+  lastname    String
+
+  birthDate   DateTime?
+  phone       String?
+  gender      String?
+  address     String?
+  notes       String?
+
+  missions    Mission[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([firstname, lastname])
+}
+
+// ===================== HOSPITAL =====================
+model Hospital {
+  id          String @id @default(uuid())
+
+  name        String
+  phone       String?
+  address     String?
+
+  latitude    Float?
+  longitude   Float?
+
+  missions    Mission[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([name])
+}
+
+// ===================== VEHICLE =====================
+model VehicleType {
+  id          String @id @default(uuid())
+
+  name        String @unique
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  vehicles    Vehicle[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+}
+
+model Vehicle {
+  id              String @id @default(uuid())
+
+  registration    String @unique
+  brand           String?
+  model           String?
+
+  level           AmbulanceLevel @default(BLS)
+
+  status          VehicleStatus @default(AVAILABLE)
+
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  vehicleTypeId   String?
+  vehicleType     VehicleType? @relation(fields: [vehicleTypeId], references: [id])
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  assignments     MissionAssignment[]
+  gpsPositions    GpsPosition[]
+  equipment       VehicleEquipment[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt @default(now())
+
+  @@index([registration])
+  @@index([status])
+  @@index([companyId])
+}
+
+// ===================== STAFF =====================
+model StaffMember {
+  id          String @id @default(uuid())
+
+  matricule   String? @unique
+  firstname   String
+  lastname    String
+
+  phone       String?
+  email       String?
+
+  type        StaffType
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  assignmentStaff AssignmentStaff[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@index([matricule])
+  @@index([companyId])
+}
+
+// ===================== MISSION =====================
+model Mission {
+  id              String @id @default(uuid())
+
+  code            String @unique
+
+  priority        MissionPriority
+  status          MissionStatus
+
+  reason          String?
+
+  pickupAddress   String?
+  destination     String?
+
+  latitude        Float?
+  longitude       Float?
+
+  callDate        DateTime @default(now())
+
+  dispatchedAt    DateTime?
+  arrivedSceneAt  DateTime?
+  transportedAt   DateTime?
+  completedAt     DateTime?
+
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  contractId      String?
+  contract        Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  patientId       String?
+  patient         Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  hospitalId      String?
+  hospital        Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+
+  assignments     MissionAssignment[]
+  events          MissionEvent[]
+  documents       MissionDocument[]
+  equipment       MissionEquipment[]
+
+  invoice         Invoice?
+
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt @default(now())
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  @@index([code])
+  @@index([status])
+  @@index([callDate])
+  @@index([customerId])
+  @@index([patientId])
+}
+
+// ===================== ASSIGNMENT =====================
+model MissionAssignment {
+  id          String @id @default(uuid())
+
+  missionId   String
+  mission     Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  vehicleId   String
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  assignedAt  DateTime @default(now())
+
+  staffMembers AssignmentStaff[]
+
+  createdAt   DateTime @default(now())
+
+  @@index([missionId])
+  @@index([vehicleId])
+}
+
+model AssignmentStaff {
+  id          String @id @default(uuid())
+
+  assignmentId String
+  assignment   MissionAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  staffId     String
+  staff       StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([assignmentId, staffId])
+  @@index([staffId])
+}
+
+// ===================== EVENTS =====================
+model MissionEvent {
+  id          String @id @default(uuid())
+
+  missionId   String
+  mission     Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  status      MissionStatus?
+  description String?
+
+  latitude    Float?
+  longitude   Float?
+
+  createdAt   DateTime @default(now())
+
+  @@index([missionId])
+  @@index([createdAt])
+}
+
+// ===================== GPS =====================
+model GpsPosition {
+  id          String @id @default(uuid())
+
+  vehicleId   String
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  latitude    Float
+  longitude   Float
+
+  speed       Float?
+  heading     Float?
+
+  address     String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([vehicleId])
+  @@index([createdAt])
+}
+
+// ===================== DOCUMENTS =====================
+model Document {
+  id          String @id @default(uuid())
+
+  name        String
+  fileUrl     String
+
+  missions    MissionDocument[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+}
+
+model MissionDocument {
+  id          String @id @default(uuid())
+
+  missionId   String
+  mission     Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([missionId, documentId])
+  @@index([missionId])
+}
+
+// ===================== EQUIPMENT =====================
+model Equipment {
+  id            String @id @default(uuid())
+
+  code          String? @unique
+  name          String
+  description   String?
+
+  quantity      Int @default(0)
+  purchasePrice Decimal? @db.Decimal(12,2)
+
+  companyId     String
+  company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  vehicleEquipment VehicleEquipment[]
+  missionEquipment MissionEquipment[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+
+  @@index([code])
+  @@index([companyId])
+}
+
+model VehicleEquipment {
+  id          String @id @default(uuid())
+
+  vehicleId   String
+  vehicle     Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  quantity    Int @default(1)
+  assignedAt  DateTime @default(now())
+  returnedAt  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@unique([vehicleId, equipmentId])
+  @@index([vehicleId])
+  @@index([equipmentId])
+}
+
+model MissionEquipment {
+  id          String @id @default(uuid())
+
+  missionId   String
+  mission     Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  quantity    Int @default(1)
+  assignedAt  DateTime @default(now())
+  returnedAt  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt @default(now())
+
+  @@unique([missionId, equipmentId])
+  @@index([missionId])
+  @@index([equipmentId])
+}
+
+// ===================== INVOICING =====================
+model Invoice {
+  id            String @id @default(uuid())
+
+  invoiceNumber String @unique
+
+  status        InvoiceStatus @default(DRAFT)
+
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  missionId     String? @unique
+  mission       Mission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+
+  issueDate     DateTime @default(now())
+  dueDate       DateTime?
+
+  subtotal      Decimal @db.Decimal(12,2)
+  tax           Decimal @db.Decimal(12,2) @default(0)
+  total         Decimal @db.Decimal(12,2)
+
+  lines         InvoiceLine[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+
+  @@index([invoiceNumber])
+  @@index([customerId])
+  @@index([status])
+}
+
+model DistanceRate {
+  id            String @id @default(uuid())
+
+  companyId     String
+  company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  minKm         Float
+  maxKm         Float
+
+  price         Decimal @db.Decimal(12,2)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+
+  @@index([companyId])
+  @@unique([companyId, minKm, maxKm])
+}
+
+model Service {
+  id            String @id @default(uuid())
+
+  companyId     String
+  company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  code          String? @unique
+  name          String
+  description   String?
+
+  unitPrice     Decimal @db.Decimal(12,2)
+
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
+
+  invoiceLines  InvoiceLine[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt @default(now())
+
+  @@index([code])
+  @@index([companyId])
+}
+
+model InvoiceLine {
+  id          String @id @default(uuid())
+
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  description String
+  quantity    Decimal @db.Decimal(10,2)
+  unitPrice   Decimal @db.Decimal(12,2)
+  total       Decimal @db.Decimal(12,2)
+
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([serviceId])
+}
+
+// ===================== NOTIFICATIONS =====================
+model Notification {
+  id        String @id @default(uuid())
+
+  title     String
+  message   String
+  isRead    Boolean @default(false)
+
+  userId    String?
+  user      User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ===================== AUDIT =====================
+model AuditLog {
+  id        String @id @default(uuid())
+
+  entity    String
+  entityId  String
+  action    String
+
+  oldValue  Json?
+  newValue  Json?
+
+  userId    String?
+  user      User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ===================== FILE =====================
+model File {
+  id        String @id @default(uuid())
+
+  filename  String
+  mimeType  String
+  size      Int
+  path      String
+  url       String
+
+  company   Company? @relation()
+  companyId String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
 }

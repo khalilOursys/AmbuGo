@@ -29,30 +29,12 @@ async function main() {
         telephone: '+212 6 00 00 00 00',
         cin: 'AA123456',
       },
-      {
-        email: 'commercial1@company.com',
-        password: hashed.commercial1,
-        role: UserRole.COMMERCIAL,
-        firstName: 'Ahmed',
-        lastName: 'Benani',
-        telephone: '+212 6 11 22 33 44',
-        cin: 'BB789012',
-      },
-      {
-        email: 'commercial2@company.com',
-        password: hashed.commercial2,
-        role: UserRole.COMMERCIAL,
-        firstName: 'Fatima',
-        lastName: 'Zahra',
-        telephone: '+212 6 55 66 77 88',
-        cin: 'CC345678',
-      },
     ],
   });
 
   const users = await prisma.user.findMany();
   console.log(`👥 Created ${users.length} users:`);
-  users.forEach(user => {
+  users.forEach((user) => {
     console.log(`   - ${user.email} (${user.role}) [ID: ${user.id}]`);
   });
 
