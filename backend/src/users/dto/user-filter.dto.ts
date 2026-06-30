@@ -1,18 +1,20 @@
-// src/companies/dto/company-filter.dto.ts
+// src/users/dto/user-filter.dto.ts
 import {
   IsOptional,
   IsString,
   IsEnum,
+  IsBoolean,
+  IsUUID,
   IsDateString,
   IsInt,
   Min,
-  IsBoolean,
+  IsIn,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
-import { PricingType } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import { Type } from 'class-transformer';
 import { ToBoolean } from '../../common/boolean.transformer';
 
-export class CompanyFilterDto {
+export class UserFilterDto {
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -27,35 +29,35 @@ export class CompanyFilterDto {
 
   @IsOptional()
   @IsString()
-  name?: string;
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @IsOptional()
   @IsString()
   email?: string;
 
   @IsOptional()
-  @IsString()
-  phone?: string;
+  @IsEnum(UserRole)
+  role?: UserRole;
 
   @IsOptional()
   @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsEnum(PricingType)
-  pricingType?: PricingType;
+  telephone?: string;
 
   @IsOptional()
   @IsString()
-  baseCurrency?: string;
+  cin?: string;
 
   @IsOptional()
-  @IsString()
-  matriculeFiscale?: string;
+  @IsUUID()
+  companyId?: string;
 
   @IsOptional()
-  @IsString()
-  rib?: string;
+  @ToBoolean()
+  isDeleted?: boolean;
 
   @IsOptional()
   @IsDateString()
@@ -66,14 +68,12 @@ export class CompanyFilterDto {
   toDate?: string;
 
   @IsOptional()
-  @ToBoolean()
-  isDeleted?: boolean = false;
+  @IsString()
+  @IsIn(['createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'role'])
+  sortBy?: string;
 
   @IsOptional()
   @IsString()
-  sortBy?: string = 'createdAt';
-
-  @IsOptional()
-  @IsString()
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }

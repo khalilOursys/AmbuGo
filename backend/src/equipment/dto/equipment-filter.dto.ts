@@ -10,6 +10,7 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ToBoolean } from '../../common/boolean.transformer';
 
 export class EquipmentFilterDto {
   @IsOptional()
@@ -78,8 +79,7 @@ export class EquipmentFilterDto {
   toDate?: string;
 
   @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
+  @ToBoolean()
   isDeleted?: boolean = false;
 
   @IsOptional()

@@ -1,4 +1,3 @@
-// app/users/edit/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,31 +6,17 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
 import { ArrowLeft, Save, User } from "lucide-react";
 
-type UserRole = "ADMIN" | "MANAGER" | "USER";
-
-interface Company {
-  id: string;
-  name: string;
-}
+type UserRole = "ADMIN" | "COMMERCIAL";
 
 interface User {
-  id: string;
+  id: number;
   email: string;
-  password: string | null;
-  telephone: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  cin: string | null;
+  telephone?: string;
+  firstName?: string;
+  lastName?: string;
+  cin?: string;
   role: UserRole;
-  companyId: string | null;
-  company: {
-    id: string;
-    name: string;
-  } | null;
   createdAt: string;
-  updatedAt: string;
-  isDeleted: boolean;
-  deletedAt: string | null;
 }
 
 interface UpdateUserDto {
@@ -42,39 +27,23 @@ interface UpdateUserDto {
   telephone?: string;
   cin?: string;
   role?: UserRole;
-  companyId?: string | null;
 }
 
 const fetchRoles = async (): Promise<string[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/roles`);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users/roles`);
   if (!response.ok) throw new Error("Failed to fetch roles");
   const data = await response.json();
   return data.roles;
 };
 
-const fetchCompanies = async (): Promise<Company[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`);
-  if (!response.ok) throw new Error("Failed to fetch companies");
-
-  const result = await response.json();
-
-  // Check if it's a paginated response (has data property and it's an array)
-  if (result.data && Array.isArray(result.data)) {
-    return result.data;
-  }
-
-  // Otherwise assume it's a direct array of companies
-  return Array.isArray(result) ? result : [];
-};
-
 const fetchUser = async (id: string): Promise<User> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${id}`);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users/${id}`);
   if (!response.ok) throw new Error("Failed to fetch user");
   return response.json();
 };
 
 const updateUser = async ({ id, data }: { id: string; data: UpdateUserDto }) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${id}`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -122,8 +91,7 @@ function EditUserContent({ id }: { id: string }) {
     lastName: "",
     telephone: "",
     cin: "",
-    role: "MANAGER",
-    companyId: null,
+    role: "COMMERCIAL",
   });
 
   const [password, setPassword] = useState("");
@@ -137,12 +105,7 @@ function EditUserContent({ id }: { id: string }) {
     queryFn: fetchRoles,
   });
 
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
-    queryKey: ["companies"],
-    queryFn: fetchCompanies,
-  });
-
-  const { data: user, isLoading: isLoadingUser, isError } = useQuery({
+  const { data: user, isLoading: isLoadingUser } = useQuery({
     queryKey: ["user", id],
     queryFn: () => fetchUser(id),
     enabled: !!id,
@@ -163,7 +126,6 @@ function EditUserContent({ id }: { id: string }) {
         telephone: user.telephone || "",
         cin: user.cin || "",
         role: user.role,
-        companyId: user.companyId,
       });
     }
   }, [user]);
@@ -192,11 +154,6 @@ function EditUserContent({ id }: { id: string }) {
       updateData.password = password;
     }
 
-    // Handle companyId - if empty string, set to null
-    if (updateData.companyId === "") {
-      updateData.companyId = null;
-    }
-
     updateMutation.mutate({ id, data: updateData });
   };
 
@@ -211,24 +168,6 @@ function EditUserContent({ id }: { id: string }) {
       <div className="p-6">
         <div className="flex justify-center items-center h-64">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="p-6">
-        <div className="rounded-sm border border-red-500 bg-red-50 p-6 text-center dark:bg-red-900/20">
-          <p className="text-red-600 dark:text-red-400">
-            Failed to load user. Please try again later.
-          </p>
-          <button
-            onClick={() => router.push("/users")}
-            className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            Back to List
-          </button>
         </div>
       </div>
     );
@@ -294,7 +233,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.firstName || ""}
+                    value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="John"
@@ -307,7 +246,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.lastName || ""}
+                    value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="Doe"
@@ -320,7 +259,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="tel"
-                    value={formData.telephone || ""}
+                    value={formData.telephone}
                     onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="+216 XX XXX XXX"
@@ -333,7 +272,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.cin || ""}
+                    value={formData.cin}
                     onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="National ID"
@@ -364,33 +303,6 @@ function EditUserContent({ id }: { id: string }) {
                     </select>
                   )}
                 </div>
-
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Company
-                  </label>
-                  {companiesLoading ? (
-                    <div className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                    </div>
-                  ) : (
-                    <select
-                      value={formData.companyId || ""}
-                      onChange={(e) => setFormData({ ...formData, companyId: e.target.value || null })}
-                      className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    >
-                      <option value="">No Company</option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Assign or change the user's company
-                  </p>
-                </div>
               </div>
 
               <div className="mt-6 flex gap-4">
@@ -404,7 +316,7 @@ function EditUserContent({ id }: { id: string }) {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex items-center gap-2 rounded-md bg-primary px-6 py-3 font-medium text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+                  className="rounded-md border border-stroke px-6 py-3 font-medium hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
                 >
                   {isSubmitting ? (
                     <>
@@ -413,7 +325,7 @@ function EditUserContent({ id }: { id: string }) {
                     </>
                   ) : (
                     <>
-                      <Save className="w-5 h-5" />
+                      {/* <Save className="w-5 h-5" /> */}
                       Update User
                     </>
                   )}

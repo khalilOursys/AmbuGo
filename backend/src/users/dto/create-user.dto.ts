@@ -1,9 +1,11 @@
+// src/users/dto/create-user.dto.ts
 import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
+  MinLength,
 } from 'class-validator';
 import { UserRole } from '@prisma/client';
 
@@ -13,26 +15,31 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
-  @IsNotEmpty()
-  password: string;
+  @IsOptional()
+  @MinLength(6)
+  password?: string;
 
   @IsString()
-  @IsNotEmpty()
-  firstName: string;
+  @IsOptional()
+  firstName?: string;
 
   @IsString()
-  @IsNotEmpty()
-  lastName: string;
+  @IsOptional()
+  lastName?: string;
 
   @IsString()
-  @IsNotEmpty()
-  telephone: string;
-
-  @IsEnum(UserRole)
-  @IsNotEmpty()
-  role: UserRole;
+  @IsOptional()
+  telephone?: string;
 
   @IsString()
   @IsOptional()
   cin?: string;
+
+  @IsEnum(UserRole)
+  @IsOptional()
+  role?: UserRole;
+
+  @IsString()
+  @IsOptional()
+  companyId?: string;
 }

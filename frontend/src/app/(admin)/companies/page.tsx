@@ -1,4 +1,4 @@
-// app/users/page.tsx
+// app/admin/companies/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -13,27 +13,26 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 
 // ------------------ Types ------------------
-type User = {
+type Company = {
   id: string;
+  name: string;
   email: string;
-  password: string | null;
-  telephone: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  cin: string | null;
-  role: string;
-  companyId: string | null;
-  company: {
-    id: string;
-    name: string;
-  } | null;
+  phone: string;
+  address: string;
+  pricingType: string;
+  baseCurrency: string;
+  matriculeFiscale: string;
+  rib: string;
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
   deletedAt: string | null;
-  _count?: {
-    auditLogs: number;
-    notifications: number;
+  _count: {
+    users: number;
+    vehicles: number;
+    equipment: number;
+    services: number;
+    staff: number;
   };
 };
 
@@ -52,81 +51,51 @@ type PaginatedResponse<T> = {
 
 type PaginationState = { pageIndex: number; pageSize: number };
 
-// ------------------ Fetchers ------------------
-const fetchUsers = async ({
+// ------------------ Fetcher ------------------
+const fetchCompanies = async ({
   page,
   limit,
-  firstName,
-  lastName,
+  name,
   email,
-  role,
-  telephone,
-  cin,
-  companyId,
+  phone,
+  pricingType,
   isDeleted,
 }: {
   page: number;
   limit: number;
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   email?: string;
-  role?: string;
-  telephone?: string;
-  cin?: string;
-  companyId?: string;
+  phone?: string;
+  pricingType?: string;
   isDeleted?: boolean;
-}): Promise<PaginatedResponse<User>> => {
+}): Promise<PaginatedResponse<Company>> => {
   const params = new URLSearchParams();
   params.append("page", page.toString());
   params.append("limit", limit.toString());
-  if (firstName) params.append("firstName", firstName);
-  if (lastName) params.append("lastName", lastName);
+  if (name) params.append("name", name);
   if (email) params.append("email", email);
-  if (role) params.append("role", role);
-  if (telephone) params.append("telephone", telephone);
-  if (cin) params.append("cin", cin);
-  if (companyId) params.append("companyId", companyId);
+  if (phone) params.append("phone", phone);
+  if (pricingType) params.append("pricingType", pricingType);
   if (isDeleted !== undefined) params.append("isDeleted", isDeleted.toString());
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/users?${params.toString()}`
+    `${process.env.NEXT_PUBLIC_API_URL}/companies?${params.toString()}`
   );
-  if (!res.ok) throw new Error("Failed to fetch users");
+  if (!res.ok) throw new Error("Failed to fetch companies");
   return res.json();
 };
 
-// Fetch roles from API
-const fetchRoles = async (): Promise<string[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/roles`);
-  if (!response.ok) throw new Error("Failed to fetch roles");
-  const data = await response.json();
-  return data.roles;
-};
-
-// Role color mapping (you can customize this)
-const getRoleColor = (role: string): string => {
-  const colors: Record<string, string> = {
-    ADMIN: "bg-purple-100 text-purple-800",
-    MANAGER: "bg-blue-100 text-blue-800",
-    USER: "bg-gray-100 text-gray-800",
-  };
-  return colors[role] || "bg-gray-100 text-gray-800";
-};
-
 // ------------------ Component ------------------
-export default function UsersPage() {
+export default function CompaniesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [limit, setLimit] = useState(10);
   const [filters, setFilters] = useState({
-    firstName: "",
-    lastName: "",
+    name: "",
     email: "",
-    role: "",
-    telephone: "",
-    cin: "",
-    companyId: "",
+    phone: "",
+    pricingType: "",
     isDeleted: false,
   });
 
@@ -135,8 +104,7 @@ export default function UsersPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [dialogAction, setDialogAction] = useState<"delete" | "soft-delete">("delete");
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -146,96 +114,85 @@ export default function UsersPage() {
     setToastOpen(true);
   };
 
-  // Fetch roles
-  const { data: roles = [], isLoading: rolesLoading } = useQuery({
-    queryKey: ["user-roles"],
-    queryFn: fetchRoles,
-  });
-
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["users", page, limit, filters],
+    queryKey: ["companies", page, limit, filters],
     queryFn: () =>
-      fetchUsers({
+      fetchCompanies({
         page,
         limit,
-        firstName: filters.firstName || undefined,
-        lastName: filters.lastName || undefined,
+        name: filters.name || undefined,
         email: filters.email || undefined,
-        role: filters.role || undefined,
-        telephone: filters.telephone || undefined,
-        cin: filters.cin || undefined,
-        companyId: filters.companyId || undefined,
+        phone: filters.phone || undefined,
+        pricingType: filters.pricingType || undefined,
         isDeleted: filters.isDeleted,
       }),
     placeholderData: keepPreviousData,
   });
 
   const handleAdd = () => {
-    router.push("/users/add");
+    router.push("/admin/companies/add");
   };
 
-  const handleEdit = (user: User) => {
-    router.push(`/users/edit/${user.id}`);
+  const handleEdit = (company: Company) => {
+    router.push(`/admin/companies/edit/${company.id}`);
   };
 
-  const handleView = (user: User) => {
-    router.push(`/users/${user.id}`);
+  const handleView = (company: Company) => {
+    router.push(`/admin/companies/${company.id}`);
   };
 
-  const handleDelete = (user: User) => {
-    setSelectedUser(user);
-    setDialogAction("delete");
+  const handleDelete = async (company: Company) => {
+    setSelectedCompany(company);
     setDialogOpen(true);
   };
 
-  const handleSoftDelete = (user: User) => {
-    setSelectedUser(user);
-    setDialogAction("soft-delete");
-    setDialogOpen(true);
-  };
-
-  const confirmAction = async () => {
-    if (!selectedUser) return;
+  const confirmDelete = async () => {
+    if (!selectedCompany) return;
 
     try {
-      let res;
-      if (dialogAction === "delete") {
-        res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}`,
-          { method: "DELETE" }
-        );
-      } else {
-        res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/soft-delete`,
-          { method: "PATCH" }
-        );
-      }
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/companies/${selectedCompany.id}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Delete failed");
 
-      if (!res.ok) throw new Error("Action failed");
-
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      const actionText = dialogAction === "delete" ? "deleted" : "soft deleted";
-      showToast(`✅ User ${selectedUser.email} ${actionText}`, "success");
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      showToast(`✅ Company ${selectedCompany.name} deleted`, "success");
     } catch (err) {
-      showToast(`❌ Failed to ${dialogAction} user`, "error");
+      showToast("❌ Failed to delete company", "error");
     } finally {
       setDialogOpen(false);
-      setSelectedUser(null);
+      setSelectedCompany(null);
     }
   };
 
-  const handleRestore = async (user: User) => {
+  const handleSoftDelete = async (company: Company) => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/${user.id}/restore`,
+        `${process.env.NEXT_PUBLIC_API_URL}/companies/${company.id}/soft-delete`,
+        { method: "PATCH" }
+      );
+      if (!res.ok) throw new Error("Soft delete failed");
+
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      showToast(`✅ Company ${company.name} soft deleted`, "success");
+    } catch (err) {
+      showToast("❌ Failed to soft delete company", "error");
+    }
+  };
+
+  const handleRestore = async (company: Company) => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/companies/${company.id}/restore`,
         { method: "PATCH" }
       );
       if (!res.ok) throw new Error("Restore failed");
 
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      showToast(`✅ User ${user.email} restored`, "success");
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      showToast(`✅ Company ${company.name} restored`, "success");
     } catch (err) {
-      showToast("❌ Failed to restore user", "error");
+      showToast("❌ Failed to restore company", "error");
     }
   };
 
@@ -246,18 +203,16 @@ export default function UsersPage() {
 
   const handleClearFilters = () => {
     setFilters({
-      firstName: "",
-      lastName: "",
+      name: "",
       email: "",
-      role: "",
-      telephone: "",
-      cin: "",
-      companyId: "",
+      phone: "",
+      pricingType: "",
       isDeleted: false,
     });
     setPage(0);
   };
 
+  // Fixed pagination handler
   const handlePaginationChange = (updater: any) => {
     const newState: PaginationState =
       typeof updater === "function"
@@ -289,47 +244,34 @@ export default function UsersPage() {
     ? data?.data[parseInt(selectedRowKey)]
     : null;
 
-  const columns: MRT_ColumnDef<User>[] = [
+  const columns: MRT_ColumnDef<Company>[] = [
+    { accessorKey: "name", header: "Name", size: 150 },
+    { accessorKey: "email", header: "Email", size: 150 },
+    { accessorKey: "phone", header: "Phone", size: 120 },
+    { accessorKey: "address", header: "Address", size: 150 },
     {
-      accessorKey: "firstName",
-      header: "First Name",
-      size: 120,
-    },
-    {
-      accessorKey: "lastName",
-      header: "Last Name",
-      size: 120,
-    },
-    {
-      accessorKey: "email",
-      header: "Email",
-      size: 180,
-    },
-    {
-      accessorKey: "telephone",
-      header: "Phone",
-      size: 120,
-    },
-    {
-      accessorKey: "role",
-      header: "Role",
+      accessorKey: "pricingType",
+      header: "Pricing",
       size: 100,
-      Cell: ({ cell }) => {
-        const role = cell.getValue() as string;
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs ${getRoleColor(role)}`}>
-            {role}
-          </span>
-        );
-      },
+      Cell: ({ cell }) => (
+        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+          {cell.getValue() as string}
+        </span>
+      ),
     },
     {
-      accessorKey: "company",
-      header: "Company",
-      size: 150,
+      accessorKey: "_count",
+      header: "Stats",
+      size: 120,
       Cell: ({ cell }) => {
-        const company = cell.getValue() as { name: string } | null;
-        return company?.name || "-";
+        const counts = cell.getValue() as Company["_count"];
+        return (
+          <div className="text-xs">
+            <div>🚗 {counts.vehicles}</div>
+            <div>👤 {counts.users}</div>
+            <div>📦 {counts.equipment}</div>
+          </div>
+        );
       },
     },
     {
@@ -382,29 +324,22 @@ export default function UsersPage() {
     <Toast.Provider swipeDirection="right">
       <div className="p-6">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Users</h1>
+          <h1 className="text-2xl font-bold">Companies</h1>
           <button
             onClick={handleAdd}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
           >
-            Add New User
+            Add New Company
           </button>
         </div>
 
         {/* Filters */}
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-6 gap-3">
           <input
             type="text"
-            placeholder="First Name..."
-            value={filters.firstName}
-            onChange={(e) => handleFilterChange("firstName", e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm"
-          />
-          <input
-            type="text"
-            placeholder="Last Name..."
-            value={filters.lastName}
-            onChange={(e) => handleFilterChange("lastName", e.target.value)}
+            placeholder="Search by name..."
+            value={filters.name}
+            onChange={(e) => handleFilterChange("name", e.target.value)}
             className="px-3 py-2 border rounded-md text-sm"
           />
           <input
@@ -417,32 +352,19 @@ export default function UsersPage() {
           <input
             type="text"
             placeholder="Phone..."
-            value={filters.telephone}
-            onChange={(e) => handleFilterChange("telephone", e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm"
-          />
-          <input
-            type="text"
-            placeholder="CIN..."
-            value={filters.cin}
-            onChange={(e) => handleFilterChange("cin", e.target.value)}
+            value={filters.phone}
+            onChange={(e) => handleFilterChange("phone", e.target.value)}
             className="px-3 py-2 border rounded-md text-sm"
           />
           <select
-            value={filters.role}
-            onChange={(e) => handleFilterChange("role", e.target.value)}
+            value={filters.pricingType}
+            onChange={(e) => handleFilterChange("pricingType", e.target.value)}
             className="px-3 py-2 border rounded-md text-sm"
           >
-            <option value="">All Roles</option>
-            {rolesLoading ? (
-              <option disabled>Loading roles...</option>
-            ) : (
-              roles.map((role) => (
-                <option key={role} value={role}>
-                  {role.charAt(0) + role.slice(1).toLowerCase()}
-                </option>
-              ))
-            )}
+            <option value="">All Pricing</option>
+            <option value="FIXED">Fixed</option>
+            <option value="PER_KM">Per KM</option>
+            <option value="DISTANCE_RANGE">Distance Range</option>
           </select>
           <select
             value={filters.isDeleted.toString()}
@@ -465,12 +387,7 @@ export default function UsersPage() {
         {selectedRowData && (
           <div className="mb-4 flex gap-2 items-center p-3 bg-gray-100 rounded-md">
             <span className="text-sm text-gray-600">
-              Selected: <strong>{selectedRowData.email}</strong>
-              {selectedRowData.firstName && selectedRowData.lastName && (
-                <span className="ml-2 text-gray-500">
-                  ({selectedRowData.firstName} {selectedRowData.lastName})
-                </span>
-              )}
+              Selected: <strong>{selectedRowData.name}</strong>
             </span>
             <button
               onClick={() => setRowSelection({})}
@@ -486,16 +403,33 @@ export default function UsersPage() {
           data={data?.data ?? []}
           state={{
             isLoading,
-            pagination: { pageIndex: page, pageSize: limit },
+            rowSelection,
+            pagination: { pageIndex: page, pageSize: limit }, // ✅ Added
           }}
           manualPagination
           rowCount={data?.meta.total ?? 0}
-          onPaginationChange={handlePaginationChange}
+          onPaginationChange={handlePaginationChange} // ✅ Fixed handler
           enableToolbarInternalActions={false}
           onRowSelectionChange={handleRowSelectionChange}
+          enableMultiRowSelection={false}
+          enableSelectAll={false}
           muiToolbarAlertBannerProps={{
             sx: { display: "none" },
           }}
+          muiTableBodyRowProps={({ row }) => ({
+            onClick: () => {
+              setRowSelection({ [row.id]: true });
+            },
+            sx: {
+              cursor: "pointer",
+              backgroundColor: row.getIsSelected()
+                ? "rgba(0, 0, 0, 0.04)"
+                : "inherit",
+              "&:hover": {
+                backgroundColor: "rgba(0, 0, 0, 0.02)",
+              },
+            },
+          })}
           initialState={{
             pagination: { pageIndex: page, pageSize: limit },
             density: "compact",
@@ -516,32 +450,20 @@ export default function UsersPage() {
         </Toast.Root>
         <Toast.Viewport className="fixed top-4 right-4 w-96 max-w-full outline-none" />
 
-        {/* Confirm Dialog */}
+        {/* Confirm Delete Dialog */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
             <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
               <Dialog.Title className="text-lg font-bold">
-                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Soft Delete"}
+                Confirm Delete
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                {dialogAction === "delete" ? (
-                  <>
-                    Are you sure you want to permanently delete user{" "}
-                    <span className="font-semibold">
-                      {selectedUser?.email ?? ""}
-                    </span>
-                    ? This action cannot be undone.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to soft delete user{" "}
-                    <span className="font-semibold">
-                      {selectedUser?.email ?? ""}
-                    </span>
-                    ? The user can be restored later.
-                  </>
-                )}
+                Are you sure you want to permanently delete{" "}
+                <span className="font-semibold">
+                  {selectedCompany?.name ?? ""}
+                </span>
+                ? This action cannot be undone.
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -551,11 +473,10 @@ export default function UsersPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={confirmAction}
-                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete" ? "bg-red-500 hover:bg-red-600" : "bg-orange-500 hover:bg-orange-600"
-                    }`}
+                  onClick={confirmDelete}
+                  className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
                 >
-                  {dialogAction === "delete" ? "Delete" : "Soft Delete"}
+                  Delete
                 </button>
               </div>
             </Dialog.Content>

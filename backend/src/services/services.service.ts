@@ -131,7 +131,6 @@ export class ServicesService {
         take: limit,
         include: {
           company: {
-            where: { isDeleted: false },
             select: {
               id: true,
               name: true,
