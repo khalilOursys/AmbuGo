@@ -1,3 +1,4 @@
+// app/users/add/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -6,27 +7,48 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
 import { ArrowLeft, Save, UserPlus } from "lucide-react";
 
-type UserRole = "ADMIN" | "COMMERCIAL";
+type UserRole = "ADMIN" | "MANAGER" | "USER";
+
+interface Company {
+  id: string;
+  name: string;
+}
 
 interface CreateUserDto {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
-  telephone: string;
-  cin: string;
+  firstName?: string;
+  lastName?: string;
+  telephone?: string;
+  cin?: string;
   role: UserRole;
+  companyId?: string;
 }
 
 const fetchRoles = async (): Promise<string[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users/roles`);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/roles`);
   if (!response.ok) throw new Error("Failed to fetch roles");
   const data = await response.json();
   return data.roles;
 };
 
+const fetchCompanies = async (): Promise<Company[]> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`);
+  if (!response.ok) throw new Error("Failed to fetch companies");
+
+  const result = await response.json();
+
+  // Check if it's a paginated response (has data property and it's an array)
+  if (result.data && Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  // Otherwise assume it's a direct array of companies
+  return Array.isArray(result) ? result : [];
+};
+
 const createUser = async (userData: CreateUserDto) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -52,7 +74,8 @@ export default function AddUserPage() {
     lastName: "",
     telephone: "",
     cin: "",
-    role: "COMMERCIAL",
+    role: "MANAGER",
+    companyId: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +86,11 @@ export default function AddUserPage() {
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ["user-roles"],
     queryFn: fetchRoles,
+  });
+
+  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+    queryKey: ["companies"],
+    queryFn: fetchCompanies,
   });
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -106,7 +134,13 @@ export default function AddUserPage() {
       return;
     }
 
-    createMutation.mutate(formData);
+    // Prepare data - remove empty companyId
+    const submitData = { ...formData };
+    if (!submitData.companyId) {
+      delete submitData.companyId;
+    }
+
+    createMutation.mutate(submitData);
   };
 
   const handleCancel = () => router.push("/users");
@@ -173,7 +207,7 @@ export default function AddUserPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.firstName}
+                    value={formData.firstName || ""}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="John"
@@ -186,7 +220,7 @@ export default function AddUserPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.lastName}
+                    value={formData.lastName || ""}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="Doe"
@@ -199,7 +233,7 @@ export default function AddUserPage() {
                   </label>
                   <input
                     type="tel"
-                    value={formData.telephone}
+                    value={formData.telephone || ""}
                     onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="+216 XX XXX XXX"
@@ -212,7 +246,7 @@ export default function AddUserPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.cin}
+                    value={formData.cin || ""}
                     onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="National ID"
@@ -243,6 +277,33 @@ export default function AddUserPage() {
                     </select>
                   )}
                 </div>
+
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Company
+                  </label>
+                  {companiesLoading ? (
+                    <div className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.companyId || ""}
+                      onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
+                      className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    >
+                      <option value="">No Company</option>
+                      {companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Optional: Assign user to a company
+                  </p>
+                </div>
               </div>
 
               <div className="mt-6 flex gap-4">
@@ -256,7 +317,7 @@ export default function AddUserPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-md border border-stroke px-6 py-3 font-medium hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
+                  className="flex items-center gap-2 rounded-md bg-primary px-6 py-3 font-medium text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>
@@ -265,7 +326,7 @@ export default function AddUserPage() {
                     </>
                   ) : (
                     <>
-                      {/* <Save className="w-5 h-5" /> */}
+                      <Save className="w-5 h-5" />
                       Save User
                     </>
                   )}

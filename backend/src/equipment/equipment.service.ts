@@ -170,7 +170,6 @@ export class EquipmentService {
         take: limit,
         include: {
           company: {
-            where: { isDeleted: false },
             select: {
               id: true,
               name: true,
@@ -180,7 +179,6 @@ export class EquipmentService {
             where: { returnedAt: null },
             include: {
               vehicle: {
-                where: { isDeleted: false },
                 select: {
                   id: true,
                   registration: true,
@@ -192,7 +190,6 @@ export class EquipmentService {
             where: { returnedAt: null },
             include: {
               mission: {
-                where: { isDeleted: false },
                 select: {
                   id: true,
                   code: true,

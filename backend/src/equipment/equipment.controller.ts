@@ -16,6 +16,7 @@ import { EquipmentService } from './equipment.service';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
 import { AssignEquipmentDto } from './dto/assign-equipment.dto';
+import { EquipmentFilterDto } from './dto/equipment-filter.dto';
 
 @Controller('equipment')
 export class EquipmentController {
@@ -29,8 +30,14 @@ export class EquipmentController {
   }
 
   @Get()
-  async findAll(@Query('companyId') companyId?: string) {
-    return await this.equipmentService.findAll(companyId);
+  async findAll(@Query() filterDto: EquipmentFilterDto) {
+    // If page and limit are provided, use pagination
+    if (filterDto.page !== undefined && filterDto.limit !== undefined) {
+      return await this.equipmentService.findAllWithPagination(filterDto);
+    }
+
+    // Otherwise return all
+    return await this.equipmentService.findAll();
   }
 
   @Get('company/:companyId')

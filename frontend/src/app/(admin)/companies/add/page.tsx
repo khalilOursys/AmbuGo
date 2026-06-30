@@ -1,132 +1,60 @@
-// app/users/edit/[id]/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
-import { ArrowLeft, Save, User } from "lucide-react";
+import { ArrowLeft, Save, UserPlus } from "lucide-react";
 
-type UserRole = "ADMIN" | "MANAGER" | "USER";
+type UserRole = "ADMIN" | "COMMERCIAL";
 
-interface Company {
-  id: string;
-  name: string;
-}
-
-interface User {
-  id: string;
+interface CreateUserDto {
   email: string;
-  password: string | null;
-  telephone: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  cin: string | null;
+  password: string;
+  firstName: string;
+  lastName: string;
+  telephone: string;
+  cin: string;
   role: UserRole;
-  companyId: string | null;
-  company: {
-    id: string;
-    name: string;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  isDeleted: boolean;
-  deletedAt: string | null;
-}
-
-interface UpdateUserDto {
-  email?: string;
-  password?: string;
-  firstName?: string;
-  lastName?: string;
-  telephone?: string;
-  cin?: string;
-  role?: UserRole;
-  companyId?: string | null;
 }
 
 const fetchRoles = async (): Promise<string[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/roles`);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users/roles`);
   if (!response.ok) throw new Error("Failed to fetch roles");
   const data = await response.json();
   return data.roles;
 };
 
-const fetchCompanies = async (): Promise<Company[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/companies`);
-  if (!response.ok) throw new Error("Failed to fetch companies");
-
-  const result = await response.json();
-
-  // Check if it's a paginated response (has data property and it's an array)
-  if (result.data && Array.isArray(result.data)) {
-    return result.data;
-  }
-
-  // Otherwise assume it's a direct array of companies
-  return Array.isArray(result) ? result : [];
-};
-
-const fetchUser = async (id: string): Promise<User> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${id}`);
-  if (!response.ok) throw new Error("Failed to fetch user");
-  return response.json();
-};
-
-const updateUser = async ({ id, data }: { id: string; data: UpdateUserDto }) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${id}`, {
-    method: "PUT",
+const createUser = async (userData: CreateUserDto) => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}users`, {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(userData),
   });
+
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || "Failed to update user");
+    throw new Error(error.message || "Failed to create user");
   }
   return response.json();
 };
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default function EditUserPage({ params }: PageProps) {
-  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
-
-  useEffect(() => {
-    params.then(setResolvedParams);
-  }, [params]);
-
-  if (!resolvedParams) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-      </div>
-    );
-  }
-
-  return <EditUserContent id={resolvedParams.id} />;
-}
-
-function EditUserContent({ id }: { id: string }) {
+export default function AddUserPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const [formData, setFormData] = useState<UpdateUserDto>({
+  const [formData, setFormData] = useState<CreateUserDto>({
     email: "",
+    password: "",
     firstName: "",
     lastName: "",
     telephone: "",
     cin: "",
-    role: "MANAGER",
-    companyId: null,
+    role: "COMMERCIAL",
   });
 
-  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -137,43 +65,17 @@ function EditUserContent({ id }: { id: string }) {
     queryFn: fetchRoles,
   });
 
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
-    queryKey: ["companies"],
-    queryFn: fetchCompanies,
-  });
-
-  const { data: user, isLoading: isLoadingUser, isError } = useQuery({
-    queryKey: ["user", id],
-    queryFn: () => fetchUser(id),
-    enabled: !!id,
-  });
-
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToastMsg(msg);
     setToastType(type);
     setToastOpen(true);
   };
 
-  useEffect(() => {
-    if (user) {
-      setFormData({
-        email: user.email,
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        telephone: user.telephone || "",
-        cin: user.cin || "",
-        role: user.role,
-        companyId: user.companyId,
-      });
-    }
-  }, [user]);
-
-  const updateMutation = useMutation({
-    mutationFn: updateUser,
+  const createMutation = useMutation({
+    mutationFn: createUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["user", id] });
-      showToast("✅ User updated successfully", "success");
+      showToast("✅ User created successfully", "success");
       setTimeout(() => router.push("/users"), 1500);
     },
     onError: (error: Error) => {
@@ -186,18 +88,25 @@ function EditUserContent({ id }: { id: string }) {
     event.preventDefault();
     setIsSubmitting(true);
 
-    const updateData: UpdateUserDto = { ...formData };
-
-    if (password) {
-      updateData.password = password;
+    if (!formData.email) {
+      showToast("Email is required", "error");
+      setIsSubmitting(false);
+      return;
     }
 
-    // Handle companyId - if empty string, set to null
-    if (updateData.companyId === "") {
-      updateData.companyId = null;
+    if (!formData.password) {
+      showToast("Password is required", "error");
+      setIsSubmitting(false);
+      return;
     }
 
-    updateMutation.mutate({ id, data: updateData });
+    if (formData.password.length < 6) {
+      showToast("Password must be at least 6 characters", "error");
+      setIsSubmitting(false);
+      return;
+    }
+
+    createMutation.mutate(formData);
   };
 
   const handleCancel = () => router.push("/users");
@@ -205,34 +114,6 @@ function EditUserContent({ id }: { id: string }) {
   const formatRoleName = (role: string) => {
     return role.charAt(0) + role.slice(1).toLowerCase();
   };
-
-  if (isLoadingUser) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="p-6">
-        <div className="rounded-sm border border-red-500 bg-red-50 p-6 text-center dark:bg-red-900/20">
-          <p className="text-red-600 dark:text-red-400">
-            Failed to load user. Please try again later.
-          </p>
-          <button
-            onClick={() => router.push("/users")}
-            className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            Back to List
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Toast.Provider>
@@ -250,8 +131,8 @@ function EditUserContent({ id }: { id: string }) {
         <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
           <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
             <h3 className="text-xl font-semibold text-black dark:text-white flex items-center gap-2">
-              <User className="w-6 h-6" />
-              Edit User
+              <UserPlus className="w-6 h-6" />
+              Add New User
             </h3>
           </div>
 
@@ -274,18 +155,16 @@ function EditUserContent({ id }: { id: string }) {
 
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Password
+                    Password <span className="text-danger">*</span>
                   </label>
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    placeholder="Leave blank to keep current password"
+                    placeholder="Minimum 6 characters"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Only fill if you want to change the password
-                  </p>
                 </div>
 
                 <div>
@@ -294,7 +173,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.firstName || ""}
+                    value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="John"
@@ -307,7 +186,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.lastName || ""}
+                    value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="Doe"
@@ -320,7 +199,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="tel"
-                    value={formData.telephone || ""}
+                    value={formData.telephone}
                     onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="+216 XX XXX XXX"
@@ -333,7 +212,7 @@ function EditUserContent({ id }: { id: string }) {
                   </label>
                   <input
                     type="text"
-                    value={formData.cin || ""}
+                    value={formData.cin}
                     onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                     placeholder="National ID"
@@ -364,33 +243,6 @@ function EditUserContent({ id }: { id: string }) {
                     </select>
                   )}
                 </div>
-
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Company
-                  </label>
-                  {companiesLoading ? (
-                    <div className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                    </div>
-                  ) : (
-                    <select
-                      value={formData.companyId || ""}
-                      onChange={(e) => setFormData({ ...formData, companyId: e.target.value || null })}
-                      className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    >
-                      <option value="">No Company</option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <p className="mt-1 text-xs text-gray-500">
-                    Assign or change the user's company
-                  </p>
-                </div>
               </div>
 
               <div className="mt-6 flex gap-4">
@@ -404,17 +256,17 @@ function EditUserContent({ id }: { id: string }) {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex items-center gap-2 rounded-md bg-primary px-6 py-3 font-medium text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+                  className="rounded-md border border-stroke px-6 py-3 font-medium hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
                 >
                   {isSubmitting ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                      Updating...
+                      Saving...
                     </>
                   ) : (
                     <>
-                      <Save className="w-5 h-5" />
-                      Update User
+                      {/* <Save className="w-5 h-5" /> */}
+                      Save User
                     </>
                   )}
                 </button>
