@@ -11,6 +11,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { SignUpDto } from './dto/sign-up.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -24,6 +25,15 @@ export class AuthController {
   @Post('login')
   async login(@Request() req: any) {
     return this.authService.login(req.user);
+  }
+
+  @Post('signup')
+  async signUp(@Body() signUpDto: SignUpDto) {
+    try {
+      return await this.authService.signUp(signUpDto);
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   @UseGuards(AuthGuard('jwt'))

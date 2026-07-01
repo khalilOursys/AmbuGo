@@ -309,21 +309,6 @@ export default function EquipmentPage() {
       size: 120,
     },
     {
-      accessorKey: "vehicleEquipment",
-      header: "Assigned To",
-      size: 120,
-      Cell: ({ cell }) => {
-        const assignments = cell.getValue() as Equipment["vehicleEquipment"];
-        return assignments.length > 0 ? (
-          <span className="text-green-600">
-            {assignments.length} vehicle(s)
-          </span>
-        ) : (
-          <span className="text-gray-400">Not assigned</span>
-        );
-      },
-    },
-    {
       id: "actions",
       header: "Actions",
       size: 250,
