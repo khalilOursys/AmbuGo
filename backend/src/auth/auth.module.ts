@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LocalStrategy } from './local.strategy';
 import { AuthController } from './auth.controller';
+import { PrismaService } from '../prisma.service';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { AuthController } from './auth.controller';
       signOptions: { expiresIn: '1h' },
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [AuthService, LocalStrategy, JwtStrategy, PrismaService],
   exports: [JwtModule, PassportModule],
   controllers: [AuthController],
 })
