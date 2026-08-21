@@ -41,6 +41,8 @@ export class EquipmentService {
   }
 
   async findAll(companyId?: string) {
+    console.log(companyId);
+
     return await this.prisma.equipment.findMany({
       where: {
         ...(companyId && { companyId }),

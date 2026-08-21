@@ -37,7 +37,7 @@ export class EquipmentController {
     }
 
     // Otherwise return all
-    return await this.equipmentService.findAll();
+    return await this.equipmentService.findAll(filterDto.companyId);
   }
 
   @Get('company/:companyId')
