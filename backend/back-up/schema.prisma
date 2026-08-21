@@ -14,7 +14,6 @@ enum UserRole {
   DISPATCHER
   SUPERVISOR
   MANAGER
-  STAFF
 }
 
 enum MissionStatus {
@@ -156,15 +155,12 @@ model User {
   telephone  String?
   firstName  String?
   lastName   String?
-  cin        String?   // French CNI or ID number
+  cin        String?
 
-  role       UserRole @default(STAFF)
+  role       UserRole @default(MANAGER)
 
   companyId  String?
   company    Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-
-  // Link to StaffMember (optional)
-  staffMember StaffMember?
 
   auditLogs  AuditLog[]
   notifications Notification[]
@@ -172,8 +168,8 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt @default(now())
 
-  isDeleted  Boolean @default(false)
-  deletedAt  DateTime?
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
 
   @@index([email])
   @@index([companyId])
@@ -331,7 +327,7 @@ model Vehicle {
 model StaffMember {
   id          String @id @default(uuid())
 
-  matricule   String? @unique  // Employee ID - used as default password
+  matricule   String? @unique
   firstname   String
   lastname    String
 
@@ -340,12 +336,8 @@ model StaffMember {
 
   type        StaffType
 
-  // Link to User account
-  userId      String? @unique
-  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  isDeleted   Boolean @default(false)
-  deletedAt   DateTime?
+  isDeleted        Boolean @default(false)
+  deletedAt        DateTime?
 
   companyId   String?
   company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
@@ -358,7 +350,6 @@ model StaffMember {
 
   @@index([matricule])
   @@index([companyId])
-  @@index([userId])
 }
 
 // ===================== MISSION =====================

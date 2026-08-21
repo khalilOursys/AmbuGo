@@ -6,9 +6,10 @@ import { Module } from '@nestjs/common';
 import { CompaniesModule } from './companies/companies.module';
 import { ServicesModule } from './services/services.module';
 import { EquipmentModule } from './equipment/equipment.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, CompaniesModule, ServicesModule, EquipmentModule],
+  imports: [AuthModule, UsersModule, CompaniesModule, ServicesModule, EquipmentModule, VehiclesModule],
   controllers: [AppController],
   providers: [PrismaService],
 })
