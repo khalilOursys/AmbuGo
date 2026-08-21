@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'DISPATCHER', 'SUPERVISOR', 'MANAGER');
+CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'DISPATCHER', 'SUPERVISOR', 'MANAGER', 'STAFF');
 
 -- CreateEnum
 CREATE TYPE "MissionStatus" AS ENUM ('CREATED', 'ASSIGNED', 'DISPATCHED', 'EN_ROUTE', 'ON_SCENE', 'TRANSPORTING', 'ARRIVED_HOSPITAL', 'COMPLETED', 'CANCELLED');
@@ -21,6 +21,18 @@ CREATE TYPE "PricingType" AS ENUM ('FIXED', 'PER_KM', 'DISTANCE_RANGE');
 
 -- CreateEnum
 CREATE TYPE "AmbulanceLevel" AS ENUM ('BLS', 'ALS', 'ICU');
+
+-- CreateEnum
+CREATE TYPE "ShiftType" AS ENUM ('MORNING', 'AFTERNOON', 'NIGHT', 'CUSTOM');
+
+-- CreateEnum
+CREATE TYPE "ScheduleStatus" AS ENUM ('ACTIVE', 'COMPLETED', 'CANCELLED', 'REPLACED');
+
+-- CreateEnum
+CREATE TYPE "StaffSourceType" AS ENUM ('SCHEDULE', 'MANUAL', 'REPLACEMENT', 'EXTRA');
+
+-- CreateEnum
+CREATE TYPE "WeekDay" AS ENUM ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY');
 
 -- CreateTable
 CREATE TABLE "Company" (
@@ -54,10 +66,12 @@ CREATE TABLE "User" (
     "firstName" TEXT,
     "lastName" TEXT,
     "cin" TEXT,
-    "role" "UserRole" NOT NULL DEFAULT 'MANAGER',
+    "role" "UserRole" NOT NULL DEFAULT 'STAFF',
     "companyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -73,6 +87,8 @@ CREATE TABLE "Customer" (
     "companyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
 );
@@ -87,6 +103,8 @@ CREATE TABLE "Contract" (
     "customerId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Contract_pkey" PRIMARY KEY ("id")
 );
@@ -103,6 +121,8 @@ CREATE TABLE "Patient" (
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Patient_pkey" PRIMARY KEY ("id")
 );
@@ -117,6 +137,8 @@ CREATE TABLE "Hospital" (
     "longitude" DOUBLE PRECISION,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Hospital_pkey" PRIMARY KEY ("id")
 );
@@ -125,6 +147,8 @@ CREATE TABLE "Hospital" (
 CREATE TABLE "VehicleType" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -141,6 +165,8 @@ CREATE TABLE "Vehicle" (
     "status" "VehicleStatus" NOT NULL DEFAULT 'AVAILABLE',
     "companyId" TEXT,
     "vehicleTypeId" TEXT,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -156,7 +182,9 @@ CREATE TABLE "StaffMember" (
     "phone" TEXT,
     "email" TEXT,
     "type" "StaffType" NOT NULL,
-    "active" BOOLEAN NOT NULL DEFAULT true,
+    "userId" TEXT,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
     "companyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -187,6 +215,8 @@ CREATE TABLE "Mission" (
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Mission_pkey" PRIMARY KEY ("id")
 );
@@ -197,7 +227,10 @@ CREATE TABLE "MissionAssignment" (
     "missionId" TEXT NOT NULL,
     "vehicleId" TEXT NOT NULL,
     "assignedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "isComplete" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MissionAssignment_pkey" PRIMARY KEY ("id")
 );
@@ -207,9 +240,62 @@ CREATE TABLE "AssignmentStaff" (
     "id" TEXT NOT NULL,
     "assignmentId" TEXT NOT NULL,
     "staffId" TEXT NOT NULL,
+    "sourceType" "StaffSourceType" NOT NULL DEFAULT 'SCHEDULE',
+    "scheduleId" TEXT,
+    "isReplacement" BOOLEAN NOT NULL DEFAULT false,
+    "replacesStaffId" TEXT,
+    "checkedIn" BOOLEAN NOT NULL DEFAULT false,
+    "checkedInAt" TIMESTAMP(3),
+    "checkedOutAt" TIMESTAMP(3),
+    "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AssignmentStaff_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VehicleStaffSchedule" (
+    "id" TEXT NOT NULL,
+    "vehicleId" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "shiftStart" TIMESTAMP(3) NOT NULL,
+    "shiftEnd" TIMESTAMP(3) NOT NULL,
+    "shiftType" "ShiftType" NOT NULL DEFAULT 'CUSTOM',
+    "isRecurring" BOOLEAN NOT NULL DEFAULT false,
+    "recurrenceRule" TEXT,
+    "validFrom" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "validUntil" TIMESTAMP(3),
+    "status" "ScheduleStatus" NOT NULL DEFAULT 'ACTIVE',
+    "isReserved" BOOLEAN NOT NULL DEFAULT false,
+    "isCheckedIn" BOOLEAN NOT NULL DEFAULT false,
+    "checkedInAt" TIMESTAMP(3),
+    "checkedOutAt" TIMESTAMP(3),
+    "shiftTemplateId" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VehicleStaffSchedule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ShiftTemplate" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "startTime" TEXT NOT NULL,
+    "endTime" TEXT NOT NULL,
+    "shiftType" "ShiftType" NOT NULL,
+    "daysOfWeek" "WeekDay"[],
+    "allowOverlap" BOOLEAN NOT NULL DEFAULT false,
+    "minStaffRequired" INTEGER NOT NULL DEFAULT 2,
+    "companyId" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ShiftTemplate_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -269,7 +355,8 @@ CREATE TABLE "Equipment" (
     "quantity" INTEGER NOT NULL DEFAULT 0,
     "purchasePrice" DECIMAL(12,2),
     "companyId" TEXT NOT NULL,
-    "active" BOOLEAN NOT NULL DEFAULT true,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -343,7 +430,8 @@ CREATE TABLE "Service" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "unitPrice" DECIMAL(12,2) NOT NULL,
-    "active" BOOLEAN NOT NULL DEFAULT true,
+    "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -471,13 +559,16 @@ CREATE INDEX "Vehicle_companyId_idx" ON "Vehicle"("companyId");
 CREATE UNIQUE INDEX "StaffMember_matricule_key" ON "StaffMember"("matricule");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "StaffMember_userId_key" ON "StaffMember"("userId");
+
+-- CreateIndex
 CREATE INDEX "StaffMember_matricule_idx" ON "StaffMember"("matricule");
 
 -- CreateIndex
 CREATE INDEX "StaffMember_companyId_idx" ON "StaffMember"("companyId");
 
 -- CreateIndex
-CREATE INDEX "StaffMember_active_idx" ON "StaffMember"("active");
+CREATE INDEX "StaffMember_userId_idx" ON "StaffMember"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Mission_code_key" ON "Mission"("code");
@@ -507,7 +598,43 @@ CREATE INDEX "MissionAssignment_vehicleId_idx" ON "MissionAssignment"("vehicleId
 CREATE INDEX "AssignmentStaff_staffId_idx" ON "AssignmentStaff"("staffId");
 
 -- CreateIndex
+CREATE INDEX "AssignmentStaff_scheduleId_idx" ON "AssignmentStaff"("scheduleId");
+
+-- CreateIndex
+CREATE INDEX "AssignmentStaff_sourceType_idx" ON "AssignmentStaff"("sourceType");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "AssignmentStaff_assignmentId_staffId_key" ON "AssignmentStaff"("assignmentId", "staffId");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_vehicleId_idx" ON "VehicleStaffSchedule"("vehicleId");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_staffId_idx" ON "VehicleStaffSchedule"("staffId");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_shiftStart_shiftEnd_idx" ON "VehicleStaffSchedule"("shiftStart", "shiftEnd");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_status_idx" ON "VehicleStaffSchedule"("status");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_isReserved_idx" ON "VehicleStaffSchedule"("isReserved");
+
+-- CreateIndex
+CREATE INDEX "VehicleStaffSchedule_shiftTemplateId_idx" ON "VehicleStaffSchedule"("shiftTemplateId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VehicleStaffSchedule_vehicleId_staffId_shiftStart_shiftEnd_key" ON "VehicleStaffSchedule"("vehicleId", "staffId", "shiftStart", "shiftEnd");
+
+-- CreateIndex
+CREATE INDEX "ShiftTemplate_companyId_idx" ON "ShiftTemplate"("companyId");
+
+-- CreateIndex
+CREATE INDEX "ShiftTemplate_isActive_idx" ON "ShiftTemplate"("isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ShiftTemplate_companyId_name_key" ON "ShiftTemplate"("companyId", "name");
 
 -- CreateIndex
 CREATE INDEX "MissionEvent_missionId_idx" ON "MissionEvent"("missionId");
@@ -535,9 +662,6 @@ CREATE INDEX "Equipment_code_idx" ON "Equipment"("code");
 
 -- CreateIndex
 CREATE INDEX "Equipment_companyId_idx" ON "Equipment"("companyId");
-
--- CreateIndex
-CREATE INDEX "Equipment_active_idx" ON "Equipment"("active");
 
 -- CreateIndex
 CREATE INDEX "VehicleEquipment_vehicleId_idx" ON "VehicleEquipment"("vehicleId");
@@ -588,9 +712,6 @@ CREATE INDEX "Service_code_idx" ON "Service"("code");
 CREATE INDEX "Service_companyId_idx" ON "Service"("companyId");
 
 -- CreateIndex
-CREATE INDEX "Service_active_idx" ON "Service"("active");
-
--- CreateIndex
 CREATE INDEX "InvoiceLine_invoiceId_idx" ON "InvoiceLine"("invoiceId");
 
 -- CreateIndex
@@ -639,6 +760,9 @@ ALTER TABLE "Vehicle" ADD CONSTRAINT "Vehicle_companyId_fkey" FOREIGN KEY ("comp
 ALTER TABLE "Vehicle" ADD CONSTRAINT "Vehicle_vehicleTypeId_fkey" FOREIGN KEY ("vehicleTypeId") REFERENCES "VehicleType"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StaffMember" ADD CONSTRAINT "StaffMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StaffMember" ADD CONSTRAINT "StaffMember_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -664,6 +788,21 @@ ALTER TABLE "AssignmentStaff" ADD CONSTRAINT "AssignmentStaff_assignmentId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "AssignmentStaff" ADD CONSTRAINT "AssignmentStaff_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "StaffMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AssignmentStaff" ADD CONSTRAINT "AssignmentStaff_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES "VehicleStaffSchedule"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VehicleStaffSchedule" ADD CONSTRAINT "VehicleStaffSchedule_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VehicleStaffSchedule" ADD CONSTRAINT "VehicleStaffSchedule_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "StaffMember"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VehicleStaffSchedule" ADD CONSTRAINT "VehicleStaffSchedule_shiftTemplateId_fkey" FOREIGN KEY ("shiftTemplateId") REFERENCES "ShiftTemplate"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ShiftTemplate" ADD CONSTRAINT "ShiftTemplate_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MissionEvent" ADD CONSTRAINT "MissionEvent_missionId_fkey" FOREIGN KEY ("missionId") REFERENCES "Mission"("id") ON DELETE CASCADE ON UPDATE CASCADE;
