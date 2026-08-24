@@ -102,6 +102,16 @@ enum WeekDay {
   SUNDAY
 }
 
+enum LocationType {
+  HOSPITAL
+  CLINIC
+  MEDICAL_CENTER
+  PHARMACY
+  NURSING_HOME
+  RESIDENCE
+  OTHER
+}
+
 // ===================== COMPANY =====================
 model Company {
   id               String @id @default(uuid())
@@ -156,14 +166,13 @@ model User {
   telephone  String?
   firstName  String?
   lastName   String?
-  cin        String?   // French CNI or ID number
+  cin        String?
 
   role       UserRole @default(STAFF)
 
   companyId  String?
   company    Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
-  // Link to StaffMember (optional)
   staffMember StaffMember?
 
   auditLogs  AuditLog[]
@@ -257,26 +266,31 @@ model Patient {
   @@index([firstname, lastname])
 }
 
-// ===================== HOSPITAL =====================
-model Hospital {
+// ===================== LOCATION (formerly Hospital) =====================
+model Location {
   id          String @id @default(uuid())
 
   name        String
+  type        LocationType @default(HOSPITAL)
   phone       String?
   address     String?
-
   latitude    Float?
   longitude   Float?
+  website     String?
+  email       String?
+  notes       String?
 
   missions    Mission[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted   Boolean @default(false)
+  deletedAt   DateTime?
 
   @@index([name])
+  @@index([type])
+  @@index([latitude, longitude])
 }
 
 // ===================== VEHICLE =====================
@@ -331,7 +345,7 @@ model Vehicle {
 model StaffMember {
   id          String @id @default(uuid())
 
-  matricule   String? @unique  // Employee ID - used as default password
+  matricule   String? @unique
   firstname   String
   lastname    String
 
@@ -340,7 +354,6 @@ model StaffMember {
 
   type        StaffType
 
-  // Link to User account
   userId      String? @unique
   user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -394,8 +407,8 @@ model Mission {
   patientId       String?
   patient         Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
-  hospitalId      String?
-  hospital        Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  locationId      String?
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   assignments     MissionAssignment[]
   events          MissionEvent[]
@@ -417,6 +430,7 @@ model Mission {
   @@index([callDate])
   @@index([customerId])
   @@index([patientId])
+  @@index([locationId])
 }
 
 // ===================== ASSIGNMENT =====================
@@ -433,10 +447,7 @@ model MissionAssignment {
 
   staffMembers AssignmentStaff[]
 
-  // Track if this is the primary/default assignment
   isDefault   Boolean @default(false)
-  
-  // Track if all staff are from schedule or manually added
   isComplete  Boolean @default(false)
 
   createdAt   DateTime @default(now())
@@ -455,18 +466,14 @@ model AssignmentStaff {
   staffId     String
   staff       StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
-  // Track if this staff member was added from schedule or manually
   sourceType  StaffSourceType @default(SCHEDULE)
   
-  // If from schedule, track which schedule
   scheduleId  String?
   schedule    VehicleStaffSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
-  // Track if this is a replacement (added manually to replace a scheduled staff)
   isReplacement Boolean @default(false)
-  replacesStaffId String? // If replacing someone
+  replacesStaffId String?
   
-  // Track actual check-in for this mission
   checkedIn   Boolean @default(false)
   checkedInAt DateTime?
   checkedOutAt DateTime?
@@ -492,35 +499,27 @@ model VehicleStaffSchedule {
   staffId     String
   staff       StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
   
-  // Shift details
   shiftStart  DateTime
   shiftEnd    DateTime
   shiftType   ShiftType @default(CUSTOM)
   
-  // Support for recurring schedules
   isRecurring Boolean @default(false)
   recurrenceRule String?
   
-  // Schedule validity
   validFrom   DateTime @default(now())
   validUntil  DateTime?
   
-  // Status tracking
   status      ScheduleStatus @default(ACTIVE)
   
-  // Track if this schedule is currently "reserved" for a mission
   isReserved  Boolean @default(false)
   
-  // Attendance tracking
   isCheckedIn Boolean @default(false)
   checkedInAt DateTime?
   checkedOutAt DateTime?
   
-  // Shift template reference (optional)
   shiftTemplateId String?
   shiftTemplate   ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id], onDelete: SetNull)
   
-  // References from AssignmentStaff
   assignmentStaff AssignmentStaff[]
   
   notes       String?
@@ -528,7 +527,6 @@ model VehicleStaffSchedule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
   
-  // A staff can only have one schedule per vehicle per time slot
   @@unique([vehicleId, staffId, shiftStart, shiftEnd])
   @@index([vehicleId])
   @@index([staffId])
@@ -545,17 +543,14 @@ model ShiftTemplate {
   name        String
   description String?
   
-  startTime   String  // Format: "08:00"
-  endTime     String  // Format: "15:00"
+  startTime   String
+  endTime     String
   shiftType   ShiftType
   
-  // Days of the week this template applies to
   daysOfWeek  WeekDay[]
   
-  // Overlap allowed? Some vehicles need overlapping shifts for handover
   allowOverlap Boolean @default(false)
   
-  // Minimum staff required for this shift
   minStaffRequired Int @default(2)
   
   companyId   String
