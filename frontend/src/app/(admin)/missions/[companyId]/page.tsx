@@ -109,6 +109,8 @@ export default function MissionsPage() {
     };
 
     const handleAssignClick = (mission: Mission) => {
+        console.log(mission);
+
         setMissionToAssign(mission);
         setAssignModalOpen(true);
     };
@@ -269,6 +271,8 @@ export default function MissionsPage() {
             header: "Assigned",
             size: 80,
             Cell: ({ row }) => {
+                console.log(row.original.assignments);
+
                 const assignments = row.original.assignments?.filter(a => !a.isComplete) || [];
                 return assignments.length > 0 ? (
                     <span className="text-green-600">✓ {assignments.length}</span>
@@ -291,7 +295,7 @@ export default function MissionsPage() {
                     </button>
                     {!row.original.isDeleted && (
                         <button
-                            className="px-2 py-1 bg-purple-500 text-white rounded-md text-xs hover:bg-purple-600 flex items-center gap-1"
+                            className="px-2 py-1 bg-green-500 text-white rounded-md text-xs hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex items-center gap-1 whitespace-nowrap"
                             onClick={() => handleAssignClick(row.original)}
                         >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,17 +313,17 @@ export default function MissionsPage() {
                                 Edit
                             </button>
                             <button
-                                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
+                                className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-orange-600"
                                 onClick={() => handleSoftDelete(row.original)}
                             >
-                                Soft Delete
+                                Delete
                             </button>
-                            <button
+                            {/* <button
                                 className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
                                 onClick={() => handleDelete(row.original)}
                             >
                                 Delete
-                            </button>
+                            </button> */}
                         </>
                     )}
                     {row.original.isDeleted && (

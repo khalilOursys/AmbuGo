@@ -189,13 +189,25 @@ export default function CreateMissionPage() {
       return;
     }
 
+    // Build the mission data with proper undefined handling
     const missionData: CreateMissionDto = {
-      ...formData,
+      companyId,
+      priority: formData.priority,
+      reason: formData.reason || undefined,
+      pickupAddress: formData.pickupAddress || undefined,
+      destination: formData.destination || undefined,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
       callDate: formData.callDate ? new Date(formData.callDate).toISOString() : undefined,
+      customerId: formData.customerId || undefined,
+      contractId: formData.contractId || undefined,
+      patientId: formData.patientId || undefined,
+      locationId: formData.locationId || undefined,
+      notes: formData.notes || undefined,
       equipment: formData.equipment?.filter(e => e.equipmentId).map(e => ({
         equipmentId: e.equipmentId,
         quantity: e.quantity || 1,
-      })),
+      })) || [],
     };
 
     try {
@@ -531,8 +543,8 @@ export default function CreateMissionPage() {
           open={toastOpen}
           onOpenChange={setToastOpen}
           className={`fixed top-20 right-4 w-80 rounded-md p-4 shadow-lg z-50 ${toastType === "success"
-              ? "bg-green-600 dark:bg-green-700 text-white"
-              : "bg-red-600 dark:bg-red-700 text-white"
+            ? "bg-green-600 dark:bg-green-700 text-white"
+            : "bg-red-600 dark:bg-red-700 text-white"
             }`}
           duration={3000}
         >

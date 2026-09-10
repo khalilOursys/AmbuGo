@@ -38,7 +38,19 @@ export class MissionController {
     }
 
     // Otherwise return all
-    return await this.missionService.findAll();
+    return await this.missionService.findAll(filterDto.companyId);
+  }
+
+  @Get('company/:companyId')
+  async findAllByCompany(
+    @Param('companyId', ParseUUIDPipe) companyId: string,
+    @Query() filterDto: FilterMissionDto,
+  ) {
+    filterDto.companyId = companyId;
+    if (filterDto.page !== undefined && filterDto.limit !== undefined) {
+      return await this.missionService.findAllWithPagination(filterDto);
+    }
+    return await this.missionService.findAll(companyId);
   }
 
   @Get('code/:code')

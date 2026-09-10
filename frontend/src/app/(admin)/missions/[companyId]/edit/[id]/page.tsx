@@ -1,4 +1,4 @@
-// src/app/vehicles/[companyId]/edit/[id]/page.tsx
+// src/app/missions/[companyId]/edit/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -6,23 +6,34 @@ import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import { useVehicle, useUpdateVehicle } from "@/hooks/useVehicles";
-import { UpdateVehicleDto } from "@/types/vehicle.types"; // Import the DTO type
+import { useMission, useUpdateMission } from "@/hooks/useMissions";
+import { UpdateMissionDto } from "@/types/mission.types";
 
 // Types
-interface VehicleType {
+interface Customer {
   id: string;
   name: string;
+  code?: string;
 }
 
-interface StaffMember {
+interface Patient {
   id: string;
-  matricule: string;
   firstname: string;
   lastname: string;
-  type: string;
-  email?: string;
   phone?: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  type: string;
+  address?: string;
+}
+
+interface Contract {
+  id: string;
+  reference: string;
+  title: string;
 }
 
 interface Equipment {
@@ -34,16 +45,32 @@ interface Equipment {
 }
 
 // API Functions
-const fetchVehicleTypes = async (): Promise<VehicleType[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/vehicle-types`);
-  if (!response.ok) throw new Error("Échec de la récupération des types de véhicules");
-  return response.json();
+const fetchCustomers = async (companyId?: string): Promise<Customer[]> => {
+  if (!companyId) return [];
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers?companyId=${companyId}`);
+  if (!response.ok) throw new Error("Failed to fetch customers");
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
 };
 
-const fetchStaffMembers = async (companyId?: string): Promise<StaffMember[]> => {
-  if (!companyId) return [];
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/staff?companyId=${companyId}`);
-  if (!response.ok) throw new Error("Échec de la récupération du personnel");
+const fetchPatients = async (): Promise<Patient[]> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`);
+  if (!response.ok) throw new Error("Failed to fetch patients");
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+};
+
+const fetchLocations = async (): Promise<Location[]> => {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/locations`);
+  if (!response.ok) throw new Error("Failed to fetch locations");
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+};
+
+const fetchContracts = async (customerId?: string): Promise<Contract[]> => {
+  if (!customerId) return [];
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/contracts?customerId=${customerId}`);
+  if (!response.ok) throw new Error("Failed to fetch contracts");
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 };
@@ -51,81 +78,83 @@ const fetchStaffMembers = async (companyId?: string): Promise<StaffMember[]> => 
 const fetchEquipment = async (companyId?: string): Promise<Equipment[]> => {
   if (!companyId) return [];
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/equipment?companyId=${companyId}`);
-  if (!response.ok) throw new Error("Échec de la récupération de l'équipement");
+  if (!response.ok) throw new Error("Failed to fetch equipment");
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 };
 
-const ambulanceLevels = [
-  { value: "BLS", label: "BLS - Basic Life Support" },
-  { value: "ALS", label: "ALS - Advanced Life Support" },
-  { value: "ICU", label: "ICU - Intensive Care Unit" },
+const missionPriorities = [
+  { value: "LOW", label: "Low" },
+  { value: "NORMAL", label: "Normal" },
+  { value: "HIGH", label: "High" },
+  { value: "CRITICAL", label: "Critical" },
 ];
 
-const vehicleStatuses = [
-  { value: "AVAILABLE", label: "Disponible" },
-  { value: "ASSIGNED", label: "Assigné" },
-  { value: "BUSY", label: "Occupé" },
-  { value: "MAINTENANCE", label: "En maintenance" },
-  { value: "OFFLINE", label: "Hors ligne" },
+const missionStatuses = [
+  { value: "CREATED", label: "Created" },
+  { value: "ASSIGNED", label: "Assigned" },
+  { value: "DISPATCHED", label: "Dispatched" },
+  { value: "EN_ROUTE", label: "En Route" },
+  { value: "ON_SCENE", label: "On Scene" },
+  { value: "TRANSPORTING", label: "Transporting" },
+  { value: "ARRIVED_HOSPITAL", label: "Arrived Hospital" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
 ];
 
-const shiftTypes = [
-  { value: "MORNING", label: "Matin (08:00 - 15:00)" },
-  { value: "AFTERNOON", label: "Après-midi (15:00 - 22:00)" },
-  { value: "NIGHT", label: "Nuit (22:00 - 08:00)" },
-  { value: "CUSTOM", label: "Personnalisé" },
-];
-
-export default function EditVehiclePage() {
+export default function EditMissionPage() {
   const router = useRouter();
   const params = useParams();
   const companyId = params.companyId as string;
-  const vehicleId = params.id as string;
+  const missionId = params.id as string;
 
-  const updateVehicle = useUpdateVehicle();
+  const updateMission = useUpdateMission();
 
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    registration: "",
-    brand: "",
-    model: "",
-    level: "BLS" as "BLS" | "ALS" | "ICU",
-    status: "AVAILABLE" as "AVAILABLE" | "ASSIGNED" | "BUSY" | "MAINTENANCE" | "OFFLINE",
-    vehicleTypeId: "",
-    staffSchedules: [] as {
-      staffId: string;
-      shiftStart: string;
-      shiftEnd: string;
-      shiftType: string;
-      isRecurring: boolean;
-      recurrenceRule?: string;
-      validFrom: string;
-      validUntil?: string;
-      notes?: string;
-    }[],
-    equipment: [] as {
-      equipmentId: string;
-      quantity: number;
-    }[],
+  const [formData, setFormData] = useState<UpdateMissionDto>({
+    priority: "NORMAL",
+    status: "CREATED",
+    reason: "",
+    pickupAddress: "",
+    destination: "",
+    latitude: undefined,
+    longitude: undefined,
+    callDate: "",
+    customerId: undefined,
+    contractId: undefined,
+    patientId: undefined,
+    locationId: undefined,
+    notes: "",
+    equipment: [],
   });
 
   // Queries
-  const { data: vehicle, isLoading: isLoadingVehicle } = useVehicle(vehicleId);
+  const { data: mission, isLoading: isLoadingMission } = useMission(missionId);
 
-  const { data: vehicleTypes = [] } = useQuery({
-    queryKey: ["vehicleTypes"],
-    queryFn: fetchVehicleTypes,
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers", companyId],
+    queryFn: () => fetchCustomers(companyId),
+    enabled: !!companyId,
   });
 
-  const { data: staffMembers = [] } = useQuery({
-    queryKey: ["staffMembers", companyId],
-    queryFn: () => fetchStaffMembers(companyId),
-    enabled: !!companyId,
+  const { data: patients = [] } = useQuery({
+    queryKey: ["patients"],
+    queryFn: fetchPatients,
+  });
+
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: fetchLocations,
+  });
+
+  const { data: contracts = [] } = useQuery({
+    queryKey: ["contracts", formData.customerId],
+    queryFn: () => fetchContracts(formData.customerId),
+    enabled: !!formData.customerId,
   });
 
   const { data: equipmentList = [] } = useQuery({
@@ -140,90 +169,48 @@ export default function EditVehiclePage() {
     setToastOpen(true);
   };
 
-  // Load vehicle data when fetched
+  // Load mission data when fetched
   useEffect(() => {
-    if (vehicle) {
+    if (mission) {
       setFormData({
-        registration: vehicle.registration || "",
-        brand: vehicle.brand || "",
-        model: vehicle.model || "",
-        level: vehicle.level || "BLS",
-        status: vehicle.status || "AVAILABLE",
-        vehicleTypeId: vehicle.vehicleTypeId || "",
-        staffSchedules: vehicle.staffSchedules?.map((s: any) => ({
-          staffId: s.staffId,
-          shiftStart: s.shiftStart,
-          shiftEnd: s.shiftEnd,
-          shiftType: s.shiftType || "CUSTOM",
-          isRecurring: s.isRecurring || false,
-          recurrenceRule: s.recurrenceRule || "",
-          validFrom: s.validFrom || new Date().toISOString(),
-          validUntil: s.validUntil || "",
-          notes: s.notes || "",
-        })) || [],
-        equipment: vehicle.equipment?.map((e: any) => ({
+        priority: mission.priority || "NORMAL",
+        status: mission.status || "CREATED",
+        reason: mission.reason || "",
+        pickupAddress: mission.pickupAddress || "",
+        destination: mission.destination || "",
+        latitude: mission.latitude || undefined,
+        longitude: mission.longitude || undefined,
+        callDate: mission.callDate ? new Date(mission.callDate).toISOString().slice(0, 16) : "",
+        customerId: mission.customerId || undefined,
+        contractId: mission.contractId || undefined,
+        patientId: mission.patientId || undefined,
+        locationId: mission.locationId || undefined,
+        notes: mission.notes || "",
+        equipment: mission.equipment?.map((e: any) => ({
           equipmentId: e.equipmentId,
           quantity: e.quantity || 1,
         })) || [],
       });
     }
-  }, [vehicle]);
-
-  // Staff schedule handlers
-  const handleAddStaffSchedule = () => {
-    const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(8, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(17, 0, 0, 0);
-
-    setFormData(prev => ({
-      ...prev,
-      staffSchedules: [
-        ...prev.staffSchedules,
-        {
-          staffId: "",
-          shiftStart: startOfDay.toISOString(),
-          shiftEnd: endOfDay.toISOString(),
-          shiftType: "CUSTOM",
-          isRecurring: false,
-          validFrom: now.toISOString(),
-          notes: "",
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveStaffSchedule = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      staffSchedules: prev.staffSchedules.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleStaffScheduleChange = (index: number, field: string, value: any) => {
-    const updated = [...formData.staffSchedules];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData(prev => ({ ...prev, staffSchedules: updated }));
-  };
+  }, [mission]);
 
   // Equipment handlers
   const handleAddEquipment = () => {
     setFormData(prev => ({
       ...prev,
-      equipment: [...prev.equipment, { equipmentId: "", quantity: 1 }],
+      equipment: [...(prev.equipment || []), { equipmentId: "", quantity: 1 }],
     }));
   };
 
   const handleRemoveEquipment = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      equipment: prev.equipment.filter((_, i) => i !== index),
+      equipment: (prev.equipment || []).filter((_, i) => i !== index),
     }));
   };
 
   const handleEquipmentChange = (index: number, field: string, value: any) => {
-    const updated = [...formData.equipment];
+    const updated = [...(formData.equipment || [])];
     updated[index] = { ...updated[index], [field]: value };
     setFormData(prev => ({ ...prev, equipment: updated }));
   };
@@ -232,64 +219,49 @@ export default function EditVehiclePage() {
     event.preventDefault();
     setIsSubmitting(true);
 
-    // Validation
-    if (!formData.registration) {
-      showToast("L'immatriculation est requise", "error");
+    if (!formData.priority) {
+      showToast("Priority is required", "error");
       setIsSubmitting(false);
       return;
     }
 
-    if (!formData.level) {
-      showToast("Veuillez sélectionner un niveau d'ambulance", "error");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Prepare data with correct types - SAME AS ADD PAGE
-    const vehicleData: UpdateVehicleDto = {
-      id: vehicleId,
-      registration: formData.registration,
-      brand: formData.brand || undefined,
-      model: formData.model || undefined,
-      level: formData.level,
+    // Prepare data with correct types
+    const missionData: UpdateMissionDto = {
+      priority: formData.priority,
       status: formData.status,
-      vehicleTypeId: formData.vehicleTypeId || undefined,
-      staffSchedules: formData.staffSchedules
-        .filter(s => s.staffId)
-        .map(s => ({
-          staffId: s.staffId,
-          shiftStart: s.shiftStart,
-          shiftEnd: s.shiftEnd,
-          shiftType: s.shiftType,
-          isRecurring: s.isRecurring,
-          recurrenceRule: s.recurrenceRule,
-          validFrom: s.validFrom,
-          validUntil: s.validUntil,
-          notes: s.notes,
-        })),
-      equipment: formData.equipment
+      reason: formData.reason || undefined,
+      pickupAddress: formData.pickupAddress || undefined,
+      destination: formData.destination || undefined,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
+      callDate: formData.callDate ? new Date(formData.callDate).toISOString() : undefined,
+      customerId: formData.customerId || undefined,
+      contractId: formData.contractId || undefined,
+      patientId: formData.patientId || undefined,
+      locationId: formData.locationId || undefined,
+      notes: formData.notes || undefined,
+      equipment: (formData.equipment || [])
         .filter(e => e.equipmentId)
         .map(e => ({
           equipmentId: e.equipmentId,
-          quantity: e.quantity,
+          quantity: e.quantity || 1,
         })),
     };
 
     try {
-      // Direct mutation without FormData - SAME AS ADD PAGE
-      await updateVehicle.mutateAsync({ id: vehicleId, data: vehicleData });
-      showToast("✅ Véhicule mis à jour avec succès", "success");
-      setTimeout(() => router.push(`/vehicles/${companyId}`), 1500);
+      await updateMission.mutateAsync({ id: missionId, data: missionData });
+      showToast("✅ Mission updated successfully", "success");
+      setTimeout(() => router.push(`/missions/${companyId}`), 1500);
     } catch (error) {
-      showToast(`❌ ${error instanceof Error ? error.message : "Problème de connexion"}`, "error");
+      showToast(`❌ ${error instanceof Error ? error.message : "Connection error"}`, "error");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCancel = () => router.push(`/vehicles/${companyId}`);
+  const handleCancel = () => router.push(`/missions/${companyId}`);
 
-  if (isLoadingVehicle) {
+  if (isLoadingMission) {
     return (
       <div className="p-6">
         <div className="flex justify-center items-center h-64">
@@ -299,90 +271,46 @@ export default function EditVehiclePage() {
     );
   }
 
-  const safeVehicleTypes = Array.isArray(vehicleTypes) ? vehicleTypes : [];
-  const safeStaffMembers = Array.isArray(staffMembers) ? staffMembers : [];
   const safeEquipmentList = Array.isArray(equipmentList) ? equipmentList : [];
 
   return (
     <Toast.Provider>
       <div className="p-6">
-        <PageBreadcrumb pageTitle={`Modifier le véhicule ${vehicle?.registration || ''}`} />
+        <PageBreadcrumb pageTitle={`Edit Mission ${mission?.code || ''}`} />
+
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => router.push(`/vehicles/${companyId}`)}
+            onClick={handleCancel}
             className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
-            ← Retour à la liste
+            ← Back to list
           </button>
         </div>
 
         <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
           <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
             <h3 className="text-xl font-semibold text-black dark:text-white">
-              Informations du véhicule
+              Mission Information
             </h3>
           </div>
 
           <form onSubmit={handleSubmit}>
             <div className="p-6.5">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Registration */}
+                {/* Priority */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Immatriculation <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.registration}
-                    onChange={(e) => setFormData({ ...formData, registration: e.target.value })}
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    placeholder="Ex: CMP1-V001"
-                  />
-                </div>
-
-                {/* Brand */}
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Marque
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    placeholder="Ex: Mercedes"
-                  />
-                </div>
-
-                {/* Model */}
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Modèle
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    placeholder="Ex: Sprinter"
-                  />
-                </div>
-
-                {/* Level */}
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Niveau d'ambulance <span className="text-danger">*</span>
+                    Priority <span className="text-danger">*</span>
                   </label>
                   <select
                     required
-                    value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: e.target.value as "BLS" | "ALS" | "ICU" })}
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   >
-                    {ambulanceLevels.map((level) => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
+                    {missionPriorities.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
                       </option>
                     ))}
                   </select>
@@ -391,186 +319,240 @@ export default function EditVehiclePage() {
                 {/* Status */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Statut
+                    Status
                   </label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   >
-                    {vehicleStatuses.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
+                    {missionStatuses.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Vehicle Type */}
+                {/* Call Date */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Type de véhicule
+                    Call Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={formData.callDate}
+                    onChange={(e) => setFormData({ ...formData, callDate: e.target.value })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  />
+                </div>
+
+                {/* Customer */}
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Customer
                   </label>
                   <select
-                    value={formData.vehicleTypeId}
-                    onChange={(e) => setFormData({ ...formData, vehicleTypeId: e.target.value })}
+                    value={formData.customerId || ""}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        customerId: e.target.value || undefined,
+                        contractId: undefined
+                      });
+                    }}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   >
-                    <option value="">Sélectionner un type</option>
-                    {safeVehicleTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
+                    <option value="">Select customer</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.code && `(${c.code})`}
                       </option>
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Staff Schedules Section */}
-              <div className="mt-8 border-t border-stroke pt-6 dark:border-strokedark">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-black dark:text-white">
-                    Plannings du personnel
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddStaffSchedule}
-                    className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 transition-colors"
+                {/* Contract */}
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Contract
+                  </label>
+                  <select
+                    value={formData.contractId || ""}
+                    onChange={(e) => setFormData({ ...formData, contractId: e.target.value || undefined })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    disabled={!formData.customerId}
                   >
-                    + Ajouter un planning
-                  </button>
+                    <option value="">Select contract</option>
+                    {contracts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.reference} - {c.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {safeStaffMembers.length === 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Aucun personnel disponible pour cette compagnie.
-                  </p>
-                )}
+                {/* Patient */}
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Patient
+                  </label>
+                  <select
+                    value={formData.patientId || ""}
+                    onChange={(e) => setFormData({ ...formData, patientId: e.target.value || undefined })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  >
+                    <option value="">Select patient</option>
+                    {patients.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.firstname} {p.lastname} {p.phone && `(${p.phone})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                {formData.staffSchedules.map((schedule, index) => (
-                  <div key={index} className="mb-4 rounded-lg border border-stroke p-4 dark:border-strokedark">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Personnel
-                        </label>
-                        <select
-                          value={schedule.staffId}
-                          onChange={(e) => handleStaffScheduleChange(index, "staffId", e.target.value)}
-                          className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                        >
-                          <option value="">Sélectionner un membre</option>
-                          {safeStaffMembers.map((staff) => (
-                            <option key={staff.id} value={staff.id}>
-                              {staff.matricule} - {staff.firstname} {staff.lastname} ({staff.type})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                {/* Location */}
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Destination Location
+                  </label>
+                  <select
+                    value={formData.locationId || ""}
+                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value || undefined })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  >
+                    <option value="">Select location</option>
+                    {locations.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} ({l.type}) {l.address && `- ${l.address}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Type de shift
-                        </label>
-                        <select
-                          value={schedule.shiftType}
-                          onChange={(e) => handleStaffScheduleChange(index, "shiftType", e.target.value)}
-                          className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                        >
-                          {shiftTypes.map((type) => (
-                            <option key={type.value} value={type.value}>
-                              {type.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                {/* Pickup Address */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Pickup Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.pickupAddress}
+                    onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Enter pickup address"
+                  />
+                </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Heure de début
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={schedule.shiftStart.slice(0, 16)}
-                          onChange={(e) => handleStaffScheduleChange(index, "shiftStart", new Date(e.target.value).toISOString())}
-                          className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                        />
-                      </div>
+                {/* Destination */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Destination Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.destination}
+                    onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Enter destination address"
+                  />
+                </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Heure de fin
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={schedule.shiftEnd.slice(0, 16)}
-                          onChange={(e) => handleStaffScheduleChange(index, "shiftEnd", new Date(e.target.value).toISOString())}
-                          className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                        />
-                      </div>
+                {/* Reason */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Reason
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.reason}
+                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Describe the reason for the mission"
+                  />
+                </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Notes
-                        </label>
-                        <input
-                          type="text"
-                          value={schedule.notes || ""}
-                          onChange={(e) => handleStaffScheduleChange(index, "notes", e.target.value)}
-                          className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                          placeholder="Notes optionnelles"
-                        />
-                      </div>
-                    </div>
+                {/* Notes */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Additional notes"
+                  />
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveStaffSchedule(index)}
-                      className="mt-3 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      Supprimer ce planning
-                    </button>
-                  </div>
-                ))}
+                {/* Coordinates */}
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Latitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.latitude || ""}
+                    onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || undefined })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="-90 to 90"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
+                    Longitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.longitude || ""}
+                    onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || undefined })}
+                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="-180 to 180"
+                  />
+                </div>
               </div>
 
               {/* Equipment Section */}
               <div className="mt-8 border-t border-stroke pt-6 dark:border-strokedark">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-semibold text-black dark:text-white">
-                    Équipement
+                    Equipment
                   </h3>
                   <button
                     type="button"
                     onClick={handleAddEquipment}
                     className="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 transition-colors"
                   >
-                    + Ajouter un équipement
+                    + Add Equipment
                   </button>
                 </div>
 
                 {safeEquipmentList.length === 0 && (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Aucun équipement disponible pour cette compagnie.
+                    No equipment available for this company.
                   </p>
                 )}
 
-                {formData.equipment.map((eq, index) => (
+                {(formData.equipment || []).map((eq, index) => (
                   <div key={index} className="mb-4 rounded-lg border border-stroke p-4 dark:border-strokedark">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div>
                         <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Équipement
+                          Equipment
                         </label>
                         <select
                           value={eq.equipmentId}
                           onChange={(e) => handleEquipmentChange(index, "equipmentId", e.target.value)}
                           className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         >
-                          <option value="">Sélectionner un équipement</option>
+                          <option value="">Select equipment</option>
                           {safeEquipmentList.map((item) => (
                             <option key={item.id} value={item.id}>
-                              {item.code} - {item.name} (Disponible: {item.quantity})
+                              {item.code} - {item.name} (Available: {item.quantity})
                             </option>
                           ))}
                         </select>
@@ -578,7 +560,7 @@ export default function EditVehiclePage() {
 
                       <div>
                         <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                          Quantité
+                          Quantity
                         </label>
                         <input
                           type="number"
@@ -595,7 +577,7 @@ export default function EditVehiclePage() {
                       onClick={() => handleRemoveEquipment(index)}
                       className="mt-3 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                     >
-                      Supprimer cet équipement
+                      Remove this equipment
                     </button>
                   </div>
                 ))}
@@ -608,20 +590,20 @@ export default function EditVehiclePage() {
                   onClick={handleCancel}
                   className="rounded-md border border-stroke px-6 py-3 font-medium hover:bg-gray-100 dark:hover:bg-meta-4 transition-colors"
                 >
-                  Annuler
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || updateVehicle.isPending}
+                  disabled={isSubmitting || updateMission.isPending}
                   className="rounded-md bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting || updateVehicle.isPending ? (
+                  {isSubmitting || updateMission.isPending ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent inline-block mr-2"></div>
-                      Mise à jour...
+                      Updating...
                     </>
                   ) : (
-                    "Mettre à jour"
+                    "Update Mission"
                   )}
                 </button>
               </div>
