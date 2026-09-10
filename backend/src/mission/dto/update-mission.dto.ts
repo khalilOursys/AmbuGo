@@ -6,11 +6,16 @@ import {
   IsString,
   IsArray,
   ValidateNested,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MissionStatus } from '@prisma/client';
 
 export class UpdateMissionDto extends PartialType(CreateMissionDto) {
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @IsOptional()
   @IsEnum(MissionStatus)
   status?: MissionStatus;

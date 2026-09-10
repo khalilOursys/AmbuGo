@@ -86,6 +86,7 @@ export default function AssignMissionModal({
     const { data: missionDetails, refetch: refetchMission, isLoading: isLoadingMission } = useMission(mission?.id || "");
 
     const [formData, setFormData] = useState<AssignMissionDto>({
+        companyId: companyId, // Add companyId here
         vehicleId: "",
         staffIds: [],
         sourceType: "MANUAL",
@@ -145,6 +146,7 @@ export default function AssignMissionModal({
 
                 setFormData(prev => ({
                     ...prev,
+                    companyId: companyId, // Ensure companyId is set
                     vehicleId: activeAssignment.vehicleId,
                     sourceType: activeAssignment.staffMembers?.[0]?.sourceType || "MANUAL",
                     notes: activeAssignment.staffMembers?.[0]?.notes || "",
@@ -165,6 +167,7 @@ export default function AssignMissionModal({
             } else {
                 setIsEditing(false);
                 setFormData({
+                    companyId: companyId, // Ensure companyId is set
                     vehicleId: "",
                     staffIds: [],
                     sourceType: "MANUAL",
@@ -174,7 +177,7 @@ export default function AssignMissionModal({
                 setSelectedStaff([]);
             }
         }
-    }, [isOpen, missionDetails, refetchVehicles, refetchStaff, refetchEquipment]);
+    }, [isOpen, missionDetails, refetchVehicles, refetchStaff, refetchEquipment, companyId]);
 
     const handleStaffToggle = (staffId: string) => {
         setSelectedStaff(prev => {
@@ -229,6 +232,7 @@ export default function AssignMissionModal({
             refetchMission();
             setIsEditing(false);
             setFormData({
+                companyId: companyId,
                 vehicleId: "",
                 staffIds: [],
                 sourceType: "MANUAL",
@@ -283,6 +287,7 @@ export default function AssignMissionModal({
 
         const data = {
             ...formData,
+            companyId: companyId, // Ensure companyId is included
             staffIds: selectedStaff,
             equipment: formData.equipment?.filter(e => e.equipmentId).map(e => ({
                 equipmentId: e.equipmentId,
@@ -299,6 +304,7 @@ export default function AssignMissionModal({
             }
             setTimeout(() => {
                 setFormData({
+                    companyId: companyId,
                     vehicleId: "",
                     staffIds: [],
                     sourceType: "MANUAL",
@@ -318,6 +324,7 @@ export default function AssignMissionModal({
 
     const handleClose = () => {
         setFormData({
+            companyId: companyId,
             vehicleId: "",
             staffIds: [],
             sourceType: "MANUAL",
@@ -520,8 +527,8 @@ export default function AssignMissionModal({
                                             <label
                                                 key={staff.id}
                                                 className={`flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition ${selectedStaff.includes(staff.id)
-                                                        ? "border-blue-500 bg-blue-50"
-                                                        : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                                                    ? "border-blue-500 bg-blue-50"
+                                                    : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
                                                     }`}
                                             >
                                                 <input

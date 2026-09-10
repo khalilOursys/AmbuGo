@@ -24,6 +24,9 @@ export class MissionEquipmentDto {
 }
 
 export class CreateMissionDto {
+  @IsUUID()
+  companyId: string;
+
   @IsEnum(MissionPriority)
   priority: MissionPriority;
 

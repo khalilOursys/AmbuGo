@@ -197,7 +197,9 @@ const checkOutStaff = async (missionId: string, staffId: string) => {
   return res.json();
 };
 
-// React Query Hooks
+// ==================== REACT QUERY HOOKS ====================
+
+// Query hooks
 export const useMissions = (params?: FilterMissionDto & { companyId?: string }) => {
   return useQuery({
     queryKey: ['missions', params],
@@ -246,7 +248,8 @@ export const useMissionEvents = (missionId: string) => {
   });
 };
 
-// Mutations
+// ==================== MUTATION HOOKS ====================
+
 export const useCreateMission = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -330,6 +333,7 @@ export const useUnassignVehicle = () => {
       unassignVehicle(missionId, vehicleId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['mission', variables.missionId] });
+      queryClient.invalidateQueries({ queryKey: ['missions'] });
     },
   });
 };
@@ -341,6 +345,7 @@ export const useCompleteAssignment = () => {
       completeAssignment(missionId, vehicleId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['mission', variables.missionId] });
+      queryClient.invalidateQueries({ queryKey: ['missions'] });
     },
   });
 };

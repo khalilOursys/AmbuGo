@@ -146,6 +146,10 @@ model Company {
   vehicles         Vehicle[]
   staff            StaffMember[]
   shiftTemplates   ShiftTemplate[]
+  patients         Patient[]
+  locations        Location[]
+  contracts        Contract[]
+  missions         Mission[]
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt @default(now())
@@ -209,8 +213,8 @@ model Customer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted   Boolean @default(false)
+  deletedAt   DateTime?
 
   @@index([name])
   @@index([companyId])
@@ -229,16 +233,20 @@ model Contract {
   customerId  String
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   missions    Mission[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted   Boolean @default(false)
+  deletedAt   DateTime?
 
   @@index([reference])
   @@index([customerId])
+  @@index([companyId])
   @@index([startDate])
 }
 
@@ -255,18 +263,22 @@ model Patient {
   address     String?
   notes       String?
 
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   missions    Mission[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt @default(now())
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted   Boolean @default(false)
+  deletedAt   DateTime?
 
   @@index([firstname, lastname])
+  @@index([companyId])
 }
 
-// ===================== LOCATION (formerly Hospital) =====================
+// ===================== LOCATION =====================
 model Location {
   id          String @id @default(uuid())
 
@@ -280,6 +292,9 @@ model Location {
   email       String?
   notes       String?
 
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   missions    Mission[]
 
   createdAt   DateTime @default(now())
@@ -290,6 +305,7 @@ model Location {
 
   @@index([name])
   @@index([type])
+  @@index([companyId])
   @@index([latitude, longitude])
 }
 
@@ -299,8 +315,8 @@ model VehicleType {
 
   name        String @unique
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted   Boolean @default(false)
+  deletedAt   DateTime?
 
   vehicles    Vehicle[]
 
@@ -325,8 +341,8 @@ model Vehicle {
   vehicleTypeId   String?
   vehicleType     VehicleType? @relation(fields: [vehicleTypeId], references: [id])
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted       Boolean @default(false)
+  deletedAt       DateTime?
 
   assignments     MissionAssignment[]
   gpsPositions    GpsPosition[]
@@ -410,6 +426,9 @@ model Mission {
   locationId      String?
   location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   assignments     MissionAssignment[]
   events          MissionEvent[]
   documents       MissionDocument[]
@@ -422,8 +441,8 @@ model Mission {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt @default(now())
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted       Boolean @default(false)
+  deletedAt       DateTime?
 
   @@index([code])
   @@index([status])
@@ -431,6 +450,7 @@ model Mission {
   @@index([customerId])
   @@index([patientId])
   @@index([locationId])
+  @@index([companyId])
 }
 
 // ===================== ASSIGNMENT =====================
@@ -650,8 +670,8 @@ model Equipment {
   companyId     String
   company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted     Boolean @default(false)
+  deletedAt     DateTime?
 
   vehicleEquipment VehicleEquipment[]
   missionEquipment MissionEquipment[]
@@ -766,8 +786,8 @@ model Service {
 
   unitPrice     Decimal @db.Decimal(12,2)
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  isDeleted     Boolean @default(false)
+  deletedAt     DateTime?
 
   invoiceLines  InvoiceLine[]
 

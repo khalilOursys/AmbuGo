@@ -23,6 +23,9 @@ export class AssignmentEquipmentDto {
 
 export class AssignMissionDto {
   @IsUUID()
+  companyId: string;
+
+  @IsUUID()
   vehicleId: string;
 
   @IsArray()

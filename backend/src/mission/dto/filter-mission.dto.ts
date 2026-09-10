@@ -10,6 +10,10 @@ import { MissionStatus, MissionPriority } from '@prisma/client';
 
 export class FilterMissionDto {
   @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
+  @IsOptional()
   @IsEnum(MissionStatus)
   status?: MissionStatus;
 

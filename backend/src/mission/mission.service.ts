@@ -20,6 +20,9 @@ export class MissionService {
   // ==================== CRUD OPERATIONS ====================
 
   async create(createMissionDto: CreateMissionDto) {
+    // Validate company exists
+    await this.getCompany(createMissionDto.companyId);
+
     // Validate related entities exist
     if (createMissionDto.customerId) {
       await this.getCustomer(createMissionDto.customerId);
@@ -38,7 +41,7 @@ export class MissionService {
     }
 
     // Generate mission code
-    const code = await this.generateMissionCode();
+    const code = await this.generateMissionCode(createMissionDto.companyId);
 
     // Handle equipment if provided
     const equipmentData = createMissionDto.equipment?.map((item) => ({
@@ -63,6 +66,7 @@ export class MissionService {
         contractId: createMissionDto.contractId,
         patientId: createMissionDto.patientId,
         locationId: createMissionDto.locationId,
+        companyId: createMissionDto.companyId,
         notes: createMissionDto.notes,
         equipment: equipmentData
           ? {
@@ -75,6 +79,7 @@ export class MissionService {
         patient: true,
         location: true,
         contract: true,
+        company: true,
         assignments: {
           include: {
             vehicle: true,
@@ -102,7 +107,7 @@ export class MissionService {
   async findAll(companyId?: string) {
     return await this.prisma.mission.findMany({
       where: {
-        ...(companyId && { customer: { companyId } }),
+        ...(companyId && { companyId }),
         isDeleted: false,
       },
       include: {
@@ -110,6 +115,7 @@ export class MissionService {
         patient: true,
         location: true,
         contract: true,
+        company: true,
         assignments: {
           include: {
             vehicle: true,
@@ -142,6 +148,7 @@ export class MissionService {
     const {
       page = 1,
       limit = 10,
+      companyId,
       status,
       priority,
       customerId,
@@ -164,6 +171,11 @@ export class MissionService {
       isDeleted: false,
       deletedAt: null,
     };
+
+    // Apply company filter
+    if (companyId) {
+      where.companyId = companyId;
+    }
 
     // Apply filters
     if (status) {
@@ -275,6 +287,12 @@ export class MissionService {
               title: true,
             },
           },
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           assignments: {
             where: { isComplete: false },
             include: {
@@ -338,6 +356,7 @@ export class MissionService {
         hasPreviousPage: page > 1,
       },
       filters: {
+        ...(companyId && { companyId }),
         ...(status && { status }),
         ...(priority && { priority }),
         ...(customerId && { customerId }),
@@ -364,6 +383,7 @@ export class MissionService {
         patient: true,
         location: true,
         contract: true,
+        company: true,
         assignments: {
           include: {
             vehicle: true,
@@ -411,6 +431,7 @@ export class MissionService {
         patient: true,
         location: true,
         contract: true,
+        company: true,
         assignments: {
           include: {
             vehicle: true,
@@ -444,6 +465,11 @@ export class MissionService {
   async update(id: string, updateMissionDto: UpdateMissionDto) {
     const mission = await this.findOne(id);
 
+    // Validate company if provided
+    if (updateMissionDto.companyId) {
+      await this.getCompany(updateMissionDto.companyId);
+    }
+
     // Validate related entities if provided
     if (updateMissionDto.customerId) {
       await this.getCustomer(updateMissionDto.customerId);
@@ -476,6 +502,7 @@ export class MissionService {
       contractId: updateMissionDto.contractId,
       patientId: updateMissionDto.patientId,
       locationId: updateMissionDto.locationId,
+      companyId: updateMissionDto.companyId,
       notes: updateMissionDto.notes,
     };
 
@@ -524,6 +551,7 @@ export class MissionService {
         patient: true,
         location: true,
         contract: true,
+        company: true,
         assignments: {
           include: {
             vehicle: true,
@@ -630,43 +658,43 @@ export class MissionService {
 
   // ==================== MISSION ASSIGNMENT ====================
 
+  // src/mission/mission.service.ts - Updated assignMission method
+
   async assignMission(assignMissionDto: AssignMissionDto, missionId: string) {
     const mission = await this.findOne(missionId);
 
-    // Validate vehicle exists
+    // Validate company exists
+    await this.getCompany(assignMissionDto.companyId);
+
+    // Validate vehicle exists and belongs to the same company
     const vehicle = await this.prisma.vehicle.findFirst({
       where: {
         id: assignMissionDto.vehicleId,
+        companyId: assignMissionDto.companyId,
         isDeleted: false,
       },
     });
 
     if (!vehicle) {
       throw new NotFoundException(
-        `Vehicle with id ${assignMissionDto.vehicleId} not found.`,
+        `Vehicle with id ${assignMissionDto.vehicleId} not found in this company.`,
       );
     }
 
-    // Check if vehicle is already assigned to this mission
+    // Check if there's an existing active assignment
     const existingAssignment = await this.prisma.missionAssignment.findFirst({
       where: {
         missionId,
-        vehicleId: assignMissionDto.vehicleId,
         isComplete: false,
       },
     });
 
-    if (existingAssignment) {
-      throw new ConflictException(
-        'This vehicle is already assigned to the mission.',
-      );
-    }
-
-    // Validate all staff members exist
+    // Validate all staff members exist and belong to the same company
     if (assignMissionDto.staffIds && assignMissionDto.staffIds.length > 0) {
       const staffMembers = await this.prisma.staffMember.findMany({
         where: {
           id: { in: assignMissionDto.staffIds },
+          companyId: assignMissionDto.companyId,
           isDeleted: false,
         },
       });
@@ -676,7 +704,72 @@ export class MissionService {
       }
     }
 
-    // Create the assignment with staff and equipment
+    // If there's an existing assignment, update it
+    if (existingAssignment) {
+      return await this.prisma.$transaction(async (prisma) => {
+        // 1. Update the vehicle in the assignment
+        const updatedAssignment = await prisma.missionAssignment.update({
+          where: { id: existingAssignment.id },
+          data: {
+            vehicleId: assignMissionDto.vehicleId,
+          },
+        });
+
+        // 2. Remove existing staff assignments
+        await prisma.assignmentStaff.deleteMany({
+          where: {
+            assignmentId: existingAssignment.id,
+          },
+        });
+
+        // 3. Add new staff assignments
+        if (assignMissionDto.staffIds && assignMissionDto.staffIds.length > 0) {
+          await prisma.assignmentStaff.createMany({
+            data: assignMissionDto.staffIds.map((staffId) => ({
+              assignmentId: existingAssignment.id,
+              staffId,
+              sourceType: assignMissionDto.sourceType || StaffSourceType.MANUAL,
+              notes: assignMissionDto.notes,
+            })),
+          });
+        }
+
+        // 4. Handle equipment - remove existing and add new
+        await prisma.missionEquipment.deleteMany({
+          where: {
+            missionId,
+          },
+        });
+
+        if (
+          assignMissionDto.equipment &&
+          assignMissionDto.equipment.length > 0
+        ) {
+          await prisma.missionEquipment.createMany({
+            data: assignMissionDto.equipment.map((item) => ({
+              missionId,
+              equipmentId: item.equipmentId,
+              quantity: item.quantity || 1,
+            })),
+          });
+        }
+
+        // 5. Return the updated assignment
+        return await prisma.missionAssignment.findUnique({
+          where: { id: existingAssignment.id },
+          include: {
+            vehicle: true,
+            staffMembers: {
+              include: {
+                staff: true,
+              },
+            },
+          },
+        });
+      });
+    }
+
+    // If no existing assignment, create a new one
     return await this.prisma.$transaction(async (prisma) => {
       // Create mission assignment
       const assignment = await prisma.missionAssignment.create({
@@ -896,16 +989,17 @@ export class MissionService {
 
   // ==================== HELPER METHODS ====================
 
-  private async generateMissionCode(): Promise<string> {
+  private async generateMissionCode(companyId: string): Promise<string> {
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const prefix = `M${year}${month}${day}`;
+    const prefix = `${year}${month}${day}`;
 
-    // Find the last mission with this prefix
+    // Find the last mission with this company and prefix
     const lastMission = await this.prisma.mission.findFirst({
       where: {
+        companyId,
         code: {
           startsWith: prefix,
         },
@@ -924,6 +1018,21 @@ export class MissionService {
     }
 
     return `${prefix}${String(sequence).padStart(4, '0')}`;
+  }
+
+  private async getCompany(companyId: string) {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        isDeleted: false,
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException(`Company with id ${companyId} not found.`);
+    }
+
+    return company;
   }
 
   private async getCustomer(customerId: string) {

@@ -126,6 +126,7 @@ export interface CreateMissionDto {
   longitude?: number;
   callDate?: string;
   customerId?: string;
+  companyId?: string;
   contractId?: string;
   patientId?: string;
   locationId?: string;
@@ -146,6 +147,7 @@ export interface UpdateMissionDto extends Partial<CreateMissionDto> {
 }
 
 export interface AssignMissionDto {
+  companyId: string;
   vehicleId: string;
   staffIds: string[];
   sourceType?: string;

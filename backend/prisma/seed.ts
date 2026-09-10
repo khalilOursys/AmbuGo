@@ -103,6 +103,8 @@ async function main() {
     },
   ];
 
+  const createdCompanies = [];
+
   for (const c of companies) {
     // ==================== CREATE COMPANY ====================
     const company = await prisma.company.create({
@@ -120,6 +122,8 @@ async function main() {
         matriculeFiscale: 'MF' + Math.floor(100000 + Math.random() * 900000),
       },
     });
+
+    createdCompanies.push(company);
 
     // ==================== USERS ====================
     await prisma.user.createMany({
@@ -466,42 +470,47 @@ async function main() {
     });
 
     // ==================== EQUIPMENT ====================
-    await prisma.equipment.createMany({
-      data: [
-        {
+    const equipmentItems = [];
+    const equipmentData = [
+      {
+        code: `${c.code}-EQ01`,
+        name: 'Defibrillator',
+        description: 'Portable AED',
+        quantity: 6,
+        purchasePrice: 4500,
+      },
+      {
+        code: `${c.code}-EQ02`,
+        name: 'Ventilator',
+        description: 'Transport ventilator',
+        quantity: 3,
+        purchasePrice: 6500,
+      },
+      {
+        code: `${c.code}-EQ03`,
+        name: 'Oxygen Cylinder',
+        description: 'Medical oxygen cylinder',
+        quantity: 20,
+        purchasePrice: 350,
+      },
+      {
+        code: `${c.code}-EQ04`,
+        name: 'Patient Monitor',
+        description: 'Vital signs monitor',
+        quantity: 5,
+        purchasePrice: 2800,
+      },
+    ];
+
+    for (const eqData of equipmentData) {
+      const equipment = await prisma.equipment.create({
+        data: {
+          ...eqData,
           companyId: company.id,
-          code: `${c.code}-EQ01`,
-          name: 'Defibrillator',
-          description: 'Portable AED',
-          quantity: 6,
-          purchasePrice: 4500,
         },
-        {
-          companyId: company.id,
-          code: `${c.code}-EQ02`,
-          name: 'Ventilator',
-          description: 'Transport ventilator',
-          quantity: 3,
-          purchasePrice: 6500,
-        },
-        {
-          companyId: company.id,
-          code: `${c.code}-EQ03`,
-          name: 'Oxygen Cylinder',
-          description: 'Medical oxygen cylinder',
-          quantity: 20,
-          purchasePrice: 350,
-        },
-        {
-          companyId: company.id,
-          code: `${c.code}-EQ04`,
-          name: 'Patient Monitor',
-          description: 'Vital signs monitor',
-          quantity: 5,
-          purchasePrice: 2800,
-        },
-      ],
-    });
+      });
+      equipmentItems.push(equipment);
+    }
 
     // ==================== DISTANCE RATES ====================
     await prisma.distanceRate.createMany({
@@ -574,6 +583,7 @@ async function main() {
         data: {
           ...contractData[i],
           customerId: customers[i % customers.length].id,
+          companyId: company.id,
         },
       });
       contracts.push(contract);
@@ -631,12 +641,15 @@ async function main() {
 
     for (const pData of patientData) {
       const patient = await prisma.patient.create({
-        data: pData,
+        data: {
+          ...pData,
+          companyId: company.id,
+        },
       });
       patients.push(patient);
     }
 
-    // ==================== LOCATIONS (formerly Hospital) ====================
+    // ==================== LOCATIONS ====================
     const locations = [];
     const locationData = [
       {
@@ -736,7 +749,10 @@ async function main() {
 
     for (const locData of locationData) {
       const location = await prisma.location.create({
-        data: locData,
+        data: {
+          ...locData,
+          companyId: company.id,
+        },
       });
       locations.push(location);
     }
@@ -816,9 +832,37 @@ async function main() {
           contractId: contract.id,
           patientId: patient.id,
           locationId: location.id,
+          companyId: company.id,
           notes: `Mission ${i + 1} for ${company.name}`,
         },
       });
+
+      // ==================== MISSION EQUIPMENT ====================
+      // Assign 2-3 equipment items to each mission
+      const numEquipment = 2 + Math.floor(Math.random() * 2); // 2-3 items
+      const shuffledEquipment = [...equipmentItems].sort(
+        () => Math.random() - 0.5,
+      );
+      const selectedEquipment = shuffledEquipment.slice(0, numEquipment);
+
+      for (const equipment of selectedEquipment) {
+        await prisma.missionEquipment.create({
+          data: {
+            missionId: mission.id,
+            equipmentId: equipment.id,
+            quantity: 1 + Math.floor(Math.random() * 3), // 1-3 quantity
+            assignedAt: new Date(
+              callDate.getTime() + 60000 + Math.random() * 300000,
+            ),
+            returnedAt:
+              statusIndex >= 7
+                ? new Date(
+                    completedAt!.getTime() - 300000 - Math.random() * 300000,
+                  )
+                : null,
+          },
+        });
+      }
 
       // ==================== MISSION ASSIGNMENT ====================
       if (statusIndex >= 1) {
@@ -1021,6 +1065,7 @@ async function main() {
     missions: await prisma.mission.count(),
     missionAssignments: await prisma.missionAssignment.count(),
     assignmentStaff: await prisma.assignmentStaff.count(),
+    missionEquipment: await prisma.missionEquipment.count(),
     missionEvents: await prisma.missionEvent.count(),
     gpsPositions: await prisma.gpsPosition.count(),
     invoices: await prisma.invoice.count(),
@@ -1048,6 +1093,7 @@ async function main() {
   console.log(`Missions               : ${stats.missions}`);
   console.log(`Mission Assignments    : ${stats.missionAssignments}`);
   console.log(`Assignment Staff       : ${stats.assignmentStaff}`);
+  console.log(`Mission Equipment      : ${stats.missionEquipment}`);
   console.log(`Mission Events         : ${stats.missionEvents}`);
   console.log(`GPS Positions          : ${stats.gpsPositions}`);
   console.log(`Invoices               : ${stats.invoices}`);

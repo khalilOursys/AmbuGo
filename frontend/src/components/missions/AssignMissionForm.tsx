@@ -81,6 +81,7 @@ export default function AssignMissionForm({
     const [toastType, setToastType] = useState<"success" | "error">("success");
 
     const [formData, setFormData] = useState<AssignMissionDto>({
+        companyId: companyId, // Add companyId here
         vehicleId: "",
         staffIds: [],
         sourceType: "MANUAL",
@@ -238,8 +239,8 @@ export default function AssignMissionForm({
                                     <label
                                         key={staff.id}
                                         className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition ${selectedStaff.includes(staff.id)
-                                                ? "border-primary bg-primary/5 dark:bg-primary/10"
-                                                : "border-stroke hover:border-primary/50 dark:border-strokedark"
+                                            ? "border-primary bg-primary/5 dark:bg-primary/10"
+                                            : "border-stroke hover:border-primary/50 dark:border-strokedark"
                                             }`}
                                     >
                                         <input
@@ -399,8 +400,8 @@ export default function AssignMissionForm({
                     open={toastOpen}
                     onOpenChange={setToastOpen}
                     className={`fixed top-20 right-4 w-80 rounded-md p-4 shadow-lg z-50 ${toastType === "success"
-                            ? "bg-green-600 dark:bg-green-700 text-white"
-                            : "bg-red-600 dark:bg-red-700 text-white"
+                        ? "bg-green-600 dark:bg-green-700 text-white"
+                        : "bg-red-600 dark:bg-red-700 text-white"
                         }`}
                     duration={3000}
                 >

@@ -24,13 +24,13 @@ export class VehicleFilterDto {
   @IsInt()
   @Min(0)
   @Type(() => Number)
-  page?: number = 0;
+  page?: number;
 
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  limit?: number = 10;
+  limit?: number;
 
   @IsOptional()
   @IsUUID()
