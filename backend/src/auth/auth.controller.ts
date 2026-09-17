@@ -1,15 +1,15 @@
+// auth.controller.ts
 import {
   Controller,
-  Post,
-  UseGuards,
-  Request,
   Get,
+  Post,
+  Request,
+  UseGuards,
   Body,
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
-import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { SignUpDto } from './dto/sign-up.dto';
 
@@ -18,7 +18,6 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
-    private readonly jwtService: JwtService,
   ) {}
 
   @UseGuards(AuthGuard('local'))
@@ -36,12 +35,20 @@ export class AuthController {
     }
   }
 
+  // NEW — used by the frontend on app load
   @UseGuards(AuthGuard('jwt'))
-  @Get('profile')
-  getProfile(@Request() req: any) {
-    var idUser = req.user.userId;
+  @Get('me')
+  async getMe(@Request() req: any) {
+    const user = await this.usersService.findOne(req.user.userId);
 
-    var user = this.usersService.findOne(idUser);
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      companyId: user.companyId ?? null,
+      companyName: user.company?.name ?? null,
+    };
   }
 }

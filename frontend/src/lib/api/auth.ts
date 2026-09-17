@@ -30,55 +30,14 @@ export const setToken = (token: string) => {
 };
 
 export const getToken = (): string | null => {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("access_token");
-  }
-  return null;
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("access_token");
 };
 
 export const removeToken = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem("access_token");
   }
-};
-
-// ---------------- User Helpers ----------------
-export const setUser = (user: AuthUser) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("user", JSON.stringify(user));
-  }
-};
-
-export const getUser = (): AuthUser | null => {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("user");
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-};
-
-export const removeUser = () => {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("user");
-  }
-};
-
-// ---------------- Combined Helpers ----------------
-export const setAuth = (data: AuthResponse) => {
-  setToken(data.access_token);
-  setUser(data.user);
-};
-
-export const clearAuth = () => {
-  removeToken();
-  removeUser();
-};
-
-export const isAuthenticated = (): boolean => {
-  return !!getToken();
 };
 
 // ---------------- Authenticated Fetch ----------------
@@ -89,9 +48,7 @@ export const authFetch = async (
   const token = getToken();
   const headers = new Headers(options.headers || {});
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
@@ -102,9 +59,8 @@ export const authFetch = async (
     headers,
   });
 
-  // Handle 401 - redirect to login
   if (response.status === 401) {
-    clearAuth();
+    removeToken();
     if (
       typeof window !== "undefined" &&
       !window.location.pathname.includes("/signin")
@@ -132,16 +88,27 @@ export const login = async (
   }
 
   const data: AuthResponse = await response.json();
-
-  // Persist both token and user
-  setAuth(data);
-
+  setToken(data.access_token); // ONLY token in localStorage
   return data;
+};
+
+// ---------------- Fetch current user ----------------
+export const fetchCurrentUser = async (): Promise<AuthUser | null> => {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const res = await authFetch(`/auth/me`);
+    if (!res.ok) return null;
+    return (await res.json()) as AuthUser;
+  } catch {
+    return null;
+  }
 };
 
 // ---------------- Logout ----------------
 export const logout = () => {
-  clearAuth();
+  removeToken();
   if (typeof window !== "undefined") {
     window.location.href = "/signin";
   }

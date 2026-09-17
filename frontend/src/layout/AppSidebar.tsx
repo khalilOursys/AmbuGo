@@ -1,3 +1,4 @@
+// components/layout/AppSidebar.tsx
 "use client";
 
 import React, {
@@ -10,8 +11,8 @@ import React, {
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useSidebar } from "../context/SidebarContext";
-import { HorizontaLDots } from "../icons/index";
+import { useSidebar } from "@/context/SidebarContext";
+import { HorizontaLDots } from "@/icons/index";
 import {
   ChevronDownIcon,
   UsersIcon,
@@ -24,7 +25,6 @@ import {
   UserCircle,
   Briefcase,
   Truck,
-  // Sub-item icons
   List,
   PlusCircle,
   Settings,
@@ -32,19 +32,15 @@ import {
   FileText,
   UserPlus,
   ShieldCheck,
-  Activity,
-  Cog,
-  MapPinned,
   Calendar,
   Route,
   Ambulance,
-  Stethoscope,
   Package,
   Boxes,
   Building,
-  UserCheck,
+  MapPinned,
 } from "lucide-react";
-import { getUser, AuthUser } from "@/lib/api/auth";
+import { useAuth } from "@/providers/AuthProvider";
 
 type SubItem = {
   name: string;
@@ -64,29 +60,14 @@ type NavItem = {
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const { user, isLoading } = useAuth();
 
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  // Read user from localStorage after mount
-  useEffect(() => {
-    setMounted(true);
-    setUser(getUser());
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "user" || e.key === "access_token") {
-        setUser(getUser());
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  // Dynamic nav items based on current user's company
   const navItems: NavItem[] = useMemo(() => {
     const cid = user?.companyId;
 
-    if (!mounted || !cid) {
+    if (isLoading) return [];
+
+    if (!cid) {
       return [
         {
           name: "Companies",
@@ -326,15 +307,13 @@ const AppSidebar: React.FC = () => {
       },
       { name: "Profile", icon: <UserCircle />, path: "/profile" },
     ];
-  }, [mounted, user?.companyId]);
+  }, [user?.companyId, isLoading]);
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";
     index: number;
   } | null>(null);
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {}
-  );
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isActive = useCallback(
@@ -354,18 +333,15 @@ const AppSidebar: React.FC = () => {
         });
       }
     });
-
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
+    if (!submenuMatched) setOpenSubmenu(null);
   }, [pathname, isActive, navItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
       const key = `${openSubmenu.type}-${openSubmenu.index}`;
       if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
+        setSubMenuHeight((prev) => ({
+          ...prev,
           [key]: subMenuRefs.current[key]?.scrollHeight || 0,
         }));
       }
@@ -373,16 +349,11 @@ const AppSidebar: React.FC = () => {
   }, [openSubmenu, navItems]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
-    setOpenSubmenu((prevOpenSubmenu) => {
-      if (
-        prevOpenSubmenu &&
-        prevOpenSubmenu.type === menuType &&
-        prevOpenSubmenu.index === index
-      ) {
-        return null;
-      }
-      return { type: menuType, index };
-    });
+    setOpenSubmenu((prev) =>
+      prev && prev.type === menuType && prev.index === index
+        ? null
+        : { type: menuType, index }
+    );
   };
 
   const renderMenuItems = (navItems: NavItem[]) => (
@@ -415,7 +386,7 @@ const AppSidebar: React.FC = () => {
                   {nav.icon}
                 </span>
                 {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className={`menu-item-text`}>{nav.name}</span>
+                  <span className="menu-item-text">{nav.name}</span>
                 )}
                 {(isExpanded || isHovered || isMobileOpen) && (
                   <ChevronDownIcon
@@ -442,7 +413,7 @@ const AppSidebar: React.FC = () => {
                     {nav.icon}
                   </span>
                   {(isExpanded || isHovered || isMobileOpen) && (
-                    <span className={`menu-item-text`}>{nav.name}</span>
+                    <span className="menu-item-text">{nav.name}</span>
                   )}
                 </Link>
               )
@@ -470,7 +441,6 @@ const AppSidebar: React.FC = () => {
                             : "menu-dropdown-item-inactive"
                           }`}
                       >
-                        {/* Sub-item icon */}
                         {subItem.icon && (
                           <span
                             className={`shrink-0 ${isActive(subItem.path)
@@ -481,9 +451,7 @@ const AppSidebar: React.FC = () => {
                             {subItem.icon}
                           </span>
                         )}
-
                         <span>{subItem.name}</span>
-
                         <span className="flex items-center gap-1 ml-auto">
                           {subItem.new && (
                             <span
