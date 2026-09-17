@@ -1,17 +1,21 @@
 // components/auth/SignInForm.tsx
 "use client";
+
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import { login } from "@/lib/api/auth";
+import { useAuth } from "@/providers/AuthProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 export default function SignInForm() {
   const router = useRouter();
+  const { setUser } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,8 +29,14 @@ export default function SignInForm() {
     setIsLoading(true);
 
     try {
-      await login({ email, password });
-      router.push("/");
+      const data = await login({ email, password });
+      setUser(data.user); // fill context
+
+      if (data.user.companyId) {
+        router.push(`/companies/${data.user.companyId}`);
+      } else {
+        router.push("/");
+      }
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -63,28 +73,30 @@ export default function SignInForm() {
                     {error}
                   </div>
                 )}
+
                 <div>
                   <Label>
-                    Email <span className="text-error-500">*</span>{" "}
+                    Email <span className="text-error-500">*</span>
                   </Label>
                   <Input
                     placeholder="info@gmail.com"
                     type="email"
                     value={email}
-                    onChange={(e: any) => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
+
                 <div>
                   <Label>
-                    Password <span className="text-error-500">*</span>{" "}
+                    Password <span className="text-error-500">*</span>
                   </Label>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={password}
-                      onChange={(e: any) => setPassword(e.target.value)}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                     />
                     <span
@@ -99,6 +111,7 @@ export default function SignInForm() {
                     </span>
                   </div>
                 </div>
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Checkbox checked={isChecked} onChange={setIsChecked} />
@@ -113,12 +126,9 @@ export default function SignInForm() {
                     Forgot password?
                   </Link>
                 </div>
+
                 <div>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    disabled={isLoading}
-                  >
+                  <Button className="w-full" size="sm" disabled={isLoading}>
                     {isLoading ? "Signing in..." : "Sign in"}
                   </Button>
                 </div>
@@ -127,7 +137,7 @@ export default function SignInForm() {
 
             <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Don&apos;t have an account? {""}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/signup"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
