@@ -146,4 +146,11 @@ export class MissionController {
   async getMissionEvents(@Param('missionId', ParseUUIDPipe) missionId: string) {
     return await this.missionService.getMissionEvents(missionId);
   }
+
+  // ==================== MISSION gps ====================
+
+  @Get(':id/gps')
+  async getMissionGps(@Param('id') id: string) {
+    return this.missionService.getMissionGpsData(id);
+  }
 }
