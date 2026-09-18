@@ -10,6 +10,7 @@ import Backdrop from "@/layout/Backdrop";
 import React from "react";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import 'leaflet/dist/leaflet.css';
 
 export default function AdminLayout({
   children,

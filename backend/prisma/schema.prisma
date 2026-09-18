@@ -262,6 +262,8 @@ model Patient {
   gender      String?
   address     String?
   notes       String?
+  latitude    Float?
+  longitude   Float?
 
   companyId   String?
   company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)

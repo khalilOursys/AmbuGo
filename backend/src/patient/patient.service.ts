@@ -8,6 +8,30 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { FilterPatientDto } from './dto/filter-patient.dto';
 
+/**
+ * Haversine distance between two GPS points, in kilometers.
+ * Rounded to 2 decimals.
+ */
+function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371; // Earth radius (km)
+  const toRad = (d: number) => (d * Math.PI) / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return +(R * c).toFixed(2);
+}
+
 @Injectable()
 export class PatientService {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,7 +39,6 @@ export class PatientService {
   // ==================== CRUD OPERATIONS ====================
 
   async create(createPatientDto: CreatePatientDto) {
-    // Validate company if provided
     if (createPatientDto.companyId) {
       await this.getCompany(createPatientDto.companyId);
     }
@@ -30,6 +53,9 @@ export class PatientService {
         phone: createPatientDto.phone,
         gender: createPatientDto.gender,
         address: createPatientDto.address,
+        // ✅ GPS
+        latitude: createPatientDto.latitude ?? null,
+        longitude: createPatientDto.longitude ?? null,
         notes: createPatientDto.notes,
         companyId: createPatientDto.companyId,
       },
@@ -72,6 +98,9 @@ export class PatientService {
       address,
       birthDateFrom,
       birthDateTo,
+      latitude,
+      longitude,
+      radiusKm,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = filterDto;
@@ -118,6 +147,16 @@ export class PatientService {
       }
     }
 
+    // ✅ Proximity filter (bounding box; refined below with Haversine)
+    const hasProximity =
+      latitude != null && longitude != null && radiusKm != null;
+
+    if (hasProximity) {
+      const box = this.boundingBox(latitude!, longitude!, radiusKm!);
+      where.latitude = { gte: box.minLat, lte: box.maxLat };
+      where.longitude = { gte: box.minLng, lte: box.maxLng };
+    }
+
     if (search) {
       where.OR = [
         { firstname: { contains: search, mode: 'insensitive' } },
@@ -154,8 +193,28 @@ export class PatientService {
       this.prisma.patient.count({ where }),
     ]);
 
+    // ✅ Refine with precise Haversine + attach distanceKm
+    let data = patients;
+    if (hasProximity) {
+      data = patients
+        .map((p) => ({
+          ...p,
+          distanceKm:
+            p.latitude != null && p.longitude != null
+              ? haversineDistance(
+                  latitude!,
+                  longitude!,
+                  p.latitude,
+                  p.longitude,
+                )
+              : null,
+        }))
+        .filter((p) => p.distanceKm != null && p.distanceKm <= radiusKm!)
+        .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+    }
+
     return {
-      data: patients,
+      data,
       meta: {
         page,
         limit,
@@ -174,6 +233,9 @@ export class PatientService {
         ...(address && { address }),
         ...(birthDateFrom && { birthDateFrom }),
         ...(birthDateTo && { birthDateTo }),
+        ...(latitude != null && { latitude }),
+        ...(longitude != null && { longitude }),
+        ...(radiusKm != null && { radiusKm }),
       },
     };
   }
@@ -216,10 +278,65 @@ export class PatientService {
     return patient;
   }
 
+  // ==================== NEARBY ====================
+
+  /**
+   * Returns patients within `radiusKm` of (lat, lng), sorted by distance.
+   * Uses a bounding box for the SQL filter and Haversine for precise refinement.
+   */
+  async findNearby(
+    lat: number,
+    lng: number,
+    radiusKm: number,
+    companyId?: string,
+  ) {
+    if (
+      Number.isNaN(lat) ||
+      Number.isNaN(lng) ||
+      Number.isNaN(radiusKm) ||
+      radiusKm <= 0
+    ) {
+      throw new BadRequestException(
+        'Invalid coordinates or radius. Expected numbers with radius > 0.',
+      );
+    }
+
+    const box = this.boundingBox(lat, lng, radiusKm);
+
+    const patients = await this.prisma.patient.findMany({
+      where: {
+        isDeleted: false,
+        latitude: { gte: box.minLat, lte: box.maxLat },
+        longitude: { gte: box.minLng, lte: box.maxLng },
+        ...(companyId && { companyId }),
+      },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        phone: true,
+        gender: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        companyId: true,
+      },
+    });
+
+    return patients
+      .map((p) => ({
+        ...p,
+        distanceKm: haversineDistance(lat, lng, p.latitude!, p.longitude!),
+      }))
+      .filter((p) => p.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }
+
+  // ==================== UPDATE ====================
+
   async update(id: string, updatePatientDto: UpdatePatientDto) {
     await this.findOne(id);
 
-    // Validate company if provided
     if (updatePatientDto.companyId) {
       await this.getCompany(updatePatientDto.companyId);
     }
@@ -235,6 +352,9 @@ export class PatientService {
         phone: updatePatientDto.phone,
         gender: updatePatientDto.gender,
         address: updatePatientDto.address,
+        // ✅ GPS (undefined = leave unchanged; null = clear)
+        latitude: updatePatientDto.latitude,
+        longitude: updatePatientDto.longitude,
         notes: updatePatientDto.notes,
         companyId: updatePatientDto.companyId,
       },
@@ -249,7 +369,6 @@ export class PatientService {
   async softDelete(id: string) {
     await this.findOne(id);
 
-    // Check if patient has active missions
     const activeMissions = await this.prisma.mission.count({
       where: {
         patientId: id,
@@ -308,7 +427,6 @@ export class PatientService {
       throw new NotFoundException(`Patient with id ${id} not found.`);
     }
 
-    // Check if patient has missions
     const missionCount = await this.prisma.mission.count({
       where: {
         patientId: id,
@@ -342,5 +460,20 @@ export class PatientService {
     }
 
     return company;
+  }
+
+  /**
+   * Bounding box around a point, used as a cheap SQL pre-filter.
+   * Returns [minLat, maxLat, minLng, maxLng] as an object.
+   */
+  private boundingBox(lat: number, lng: number, radiusKm: number) {
+    const latDelta = radiusKm / 111;
+    const lngDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
+    return {
+      minLat: lat - latDelta,
+      maxLat: lat + latDelta,
+      minLng: lng - lngDelta,
+      maxLng: lng + lngDelta,
+    };
   }
 }

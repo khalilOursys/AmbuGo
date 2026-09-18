@@ -12,10 +12,29 @@ import { FilterMissionDto } from './dto/filter-mission.dto';
 import { AssignMissionDto } from './dto/assign-mission.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { StaffSourceType } from '@prisma/client';
+import { haversineDistance } from '../common/utils/geo.util';
+import { RoutingService } from '../common/services/routing.service';
+import { formatDuration, formatTimeHHmm } from '../common/utils/time.util';
+// Average speeds (km/h)
+const AMBULANCE_AVG_SPEED_KMH = {
+  EMERGENCY: 60, // HIGH / CRITICAL
+  NORMAL: 40, // NORMAL / LOW
+};
 
+export interface EtaResult {
+  minutes: number;
+  human: string;
+  etaIso: string;
+  etaLocal: string;
+  speedKmh?: number;
+  source: 'OSRM' | 'HAVERSINE';
+}
 @Injectable()
 export class MissionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private routing: RoutingService,
+  ) {}
 
   // ==================== CRUD OPERATIONS ====================
 
@@ -1094,4 +1113,347 @@ export class MissionService {
 
     return contract;
   }
+
+  async getMissionGpsData(missionId: string) {
+    const mission = await this.prisma.mission.findUnique({
+      where: { id: missionId },
+      include: {
+        patient: true,
+        location: true,
+        assignments: {
+          include: {
+            vehicle: {
+              include: {
+                gpsPositions: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!mission) throw new NotFoundException('Mission not found');
+
+    const patient = mission.patient;
+    const destination = mission.location;
+
+    const hasCoords =
+      patient?.latitude != null &&
+      patient?.longitude != null &&
+      destination?.latitude != null &&
+      destination?.longitude != null;
+
+    // Straight-line fallback
+    const straightLineKm = hasCoords
+      ? haversineDistance(
+          patient!.latitude!,
+          patient!.longitude!,
+          destination!.latitude!,
+          destination!.longitude!,
+        )
+      : null;
+
+    // Try OSRM, else fallback
+    let distanceKm: number | null = null;
+    let eta: EtaResult | null = null;
+
+    if (hasCoords) {
+      const osrm = await this.routing.getRoute(
+        patient!.latitude!,
+        patient!.longitude!,
+        destination!.latitude!,
+        destination!.longitude!,
+      );
+
+      const now = new Date();
+
+      if (osrm) {
+        distanceKm = osrm.distanceKm;
+        const arrival = new Date(now.getTime() + osrm.durationMinutes * 60_000);
+        eta = {
+          minutes: osrm.durationMinutes,
+          human: osrm.durationHuman,
+          etaIso: arrival.toISOString(),
+          etaLocal: formatTimeHHmm(arrival),
+          source: 'OSRM',
+        };
+      } else if (straightLineKm != null) {
+        const speedKmh =
+          mission.priority === 'CRITICAL' || mission.priority === 'HIGH'
+            ? AMBULANCE_AVG_SPEED_KMH.EMERGENCY
+            : AMBULANCE_AVG_SPEED_KMH.NORMAL;
+
+        const minutes = +((straightLineKm / speedKmh) * 60).toFixed(1);
+        const arrival = new Date(now.getTime() + minutes * 60_000);
+
+        distanceKm = straightLineKm;
+        eta = {
+          minutes,
+          human: formatDuration(minutes),
+          etaIso: arrival.toISOString(),
+          etaLocal: formatTimeHHmm(arrival),
+          speedKmh,
+          source: 'HAVERSINE',
+        };
+      }
+    }
+
+    const firstAssignment = mission.assignments?.[0];
+    const vehicle = firstAssignment?.vehicle;
+    const lastGps = vehicle?.gpsPositions?.[0];
+
+    return {
+      mission: {
+        id: mission.id,
+        code: mission.code,
+        status: mission.status,
+        priority: mission.priority,
+        pickupAddress: mission.pickupAddress,
+      },
+      patient: patient
+        ? {
+            id: patient.id,
+            fullname: `${patient.firstname} ${patient.lastname}`,
+            phone: patient.phone,
+            address: patient.address,
+            latitude: patient.latitude,
+            longitude: patient.longitude,
+          }
+        : null,
+      pickup: {
+        latitude: mission.latitude,
+        longitude: mission.longitude,
+        address: mission.pickupAddress,
+      },
+      destination: destination
+        ? {
+            id: destination.id,
+            name: destination.name,
+            type: destination.type,
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+            address: destination.address,
+          }
+        : null,
+      distance: {
+        patientToDestinationKm: distanceKm,
+      },
+      estimatedTime: eta,
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            registration: vehicle.registration,
+            latitude: lastGps?.latitude ?? null,
+            longitude: lastGps?.longitude ?? null,
+            lastUpdate: lastGps?.createdAt ?? null,
+          }
+        : null,
+    };
+  }
+  //v1 methode GPS mission
+  /* async getMissionGpsData(missionId: string) {
+    const mission = await this.prisma.mission.findUnique({
+      where: { id: missionId },
+      include: {
+        patient: true,
+        location: true,
+        assignments: {
+          include: {
+            vehicle: {
+              include: {
+                gpsPositions: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!mission) throw new NotFoundException('Mission not found');
+
+    const patient = mission.patient;
+    const destination = mission.location;
+
+    // ✅ Distance: patient → destination only
+    const patientToDestinationKm =
+      patient?.latitude != null &&
+      patient?.longitude != null &&
+      destination?.latitude != null &&
+      destination?.longitude != null
+        ? haversineDistance(
+            patient.latitude,
+            patient.longitude,
+            destination.latitude,
+            destination.longitude,
+          )
+        : null;
+
+    const firstAssignment = mission.assignments?.[0];
+    const vehicle = firstAssignment?.vehicle;
+    const lastGps = vehicle?.gpsPositions?.[0];
+
+    return {
+      mission: {
+        id: mission.id,
+        code: mission.code,
+        status: mission.status,
+        priority: mission.priority,
+        pickupAddress: mission.pickupAddress,
+      },
+      patient: patient
+        ? {
+            id: patient.id,
+            fullname: `${patient.firstname} ${patient.lastname}`,
+            phone: patient.phone,
+            address: patient.address,
+            latitude: patient.latitude,
+            longitude: patient.longitude,
+          }
+        : null,
+      pickup: {
+        latitude: mission.latitude,
+        longitude: mission.longitude,
+        address: mission.pickupAddress,
+      },
+      destination: destination
+        ? {
+            id: destination.id,
+            name: destination.name,
+            type: destination.type,
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+            address: destination.address,
+          }
+        : null,
+      // ✅ Single distance: patient → destination
+      distance: {
+        patientToDestinationKm,
+      },
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            registration: vehicle.registration,
+            latitude: lastGps?.latitude ?? null,
+            longitude: lastGps?.longitude ?? null,
+            lastUpdate: lastGps?.createdAt ?? null,
+          }
+        : null,
+    };
+  } */
+
+  //v0 methode GPS mission
+  /* async getMissionGpsData(missionId: string) {
+    const mission = await this.prisma.mission.findUnique({
+      where: { id: missionId },
+      include: {
+        patient: true,
+        location: true,
+        assignments: {
+          include: {
+            vehicle: {
+              include: {
+                gpsPositions: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!mission) throw new NotFoundException('Mission not found');
+
+    const patient = mission.patient;
+    const pickup = { lat: mission.latitude, lon: mission.longitude };
+    const destination = mission.location;
+
+    // Distance: patient → pickup
+    const patientToPickupKm =
+      patient?.latitude != null &&
+      patient?.longitude != null &&
+      pickup.lat != null &&
+      pickup.lon != null
+        ? haversineDistance(
+            patient.latitude,
+            patient.longitude,
+            pickup.lat,
+            pickup.lon,
+          )
+        : null;
+
+    // Distance: pickup → destination
+    const pickupToDestinationKm =
+      pickup.lat != null &&
+      pickup.lon != null &&
+      destination?.latitude != null &&
+      destination?.longitude != null
+        ? haversineDistance(
+            pickup.lat,
+            pickup.lon,
+            destination.latitude,
+            destination.longitude,
+          )
+        : null;
+
+    const firstAssignment = mission.assignments?.[0];
+    const vehicle = firstAssignment?.vehicle;
+    const lastGps = vehicle?.gpsPositions?.[0];
+
+    return {
+      mission: {
+        id: mission.id,
+        code: mission.code,
+        status: mission.status,
+        priority: mission.priority,
+        pickupAddress: mission.pickupAddress,
+      },
+      patient: patient
+        ? {
+            id: patient.id,
+            fullname: `${patient.firstname} ${patient.lastname}`,
+            phone: patient.phone,
+            address: patient.address,
+            latitude: patient.latitude,
+            longitude: patient.longitude,
+          }
+        : null,
+      pickup: {
+        latitude: mission.latitude,
+        longitude: mission.longitude,
+        address: mission.pickupAddress,
+      },
+      destination: destination
+        ? {
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+            address: destination.address,
+          }
+        : null,
+      distance: {
+        patientToPickupKm,
+        pickupToDestinationKm,
+        totalKm:
+          patientToPickupKm != null && pickupToDestinationKm != null
+            ? +(patientToPickupKm + pickupToDestinationKm).toFixed(2)
+            : null,
+      },
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            registration: vehicle.registration,
+            latitude: lastGps?.latitude ?? null,
+            longitude: lastGps?.longitude ?? null,
+            lastUpdate: lastGps?.createdAt ?? null,
+          }
+        : null,
+    };
+  } */
 }
