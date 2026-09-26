@@ -10,17 +10,12 @@ import { useMission, useUpdateMission } from "@/hooks/useMissions";
 import { UpdateMissionDto } from "@/types/mission.types";
 
 // Types
-interface Customer {
-  id: string;
-  name: string;
-  code?: string;
-}
-
 interface Patient {
   id: string;
   firstname: string;
   lastname: string;
   phone?: string;
+  address?: string;
 }
 
 interface Location {
@@ -28,12 +23,6 @@ interface Location {
   name: string;
   type: string;
   address?: string;
-}
-
-interface Contract {
-  id: string;
-  reference: string;
-  title: string;
 }
 
 interface Equipment {
@@ -45,32 +34,18 @@ interface Equipment {
 }
 
 // API Functions
-const fetchCustomers = async (companyId?: string): Promise<Customer[]> => {
+const fetchPatients = async (companyId?: string): Promise<Patient[]> => {
   if (!companyId) return [];
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/customers?companyId=${companyId}`);
-  if (!response.ok) throw new Error("Failed to fetch customers");
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
-};
-
-const fetchPatients = async (): Promise<Patient[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients?companyId=${companyId}`);
   if (!response.ok) throw new Error("Failed to fetch patients");
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 };
 
-const fetchLocations = async (): Promise<Location[]> => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/locations`);
+const fetchLocations = async (companyId?: string): Promise<Location[]> => {
+  if (!companyId) return [];
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/locations?companyId=${companyId}`);
   if (!response.ok) throw new Error("Failed to fetch locations");
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
-};
-
-const fetchContracts = async (customerId?: string): Promise<Contract[]> => {
-  if (!customerId) return [];
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/contracts?customerId=${customerId}`);
-  if (!response.ok) throw new Error("Failed to fetch contracts");
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 };
@@ -124,8 +99,6 @@ export default function EditMissionPage() {
     latitude: undefined,
     longitude: undefined,
     callDate: "",
-    customerId: undefined,
-    contractId: undefined,
     patientId: undefined,
     locationId: undefined,
     notes: "",
@@ -135,26 +108,16 @@ export default function EditMissionPage() {
   // Queries
   const { data: mission, isLoading: isLoadingMission } = useMission(missionId);
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ["customers", companyId],
-    queryFn: () => fetchCustomers(companyId),
+  const { data: patients = [] } = useQuery({
+    queryKey: ["patients", companyId],
+    queryFn: () => fetchPatients(companyId),
     enabled: !!companyId,
   });
 
-  const { data: patients = [] } = useQuery({
-    queryKey: ["patients"],
-    queryFn: fetchPatients,
-  });
-
   const { data: locations = [] } = useQuery({
-    queryKey: ["locations"],
-    queryFn: fetchLocations,
-  });
-
-  const { data: contracts = [] } = useQuery({
-    queryKey: ["contracts", formData.customerId],
-    queryFn: () => fetchContracts(formData.customerId),
-    enabled: !!formData.customerId,
+    queryKey: ["locations", companyId],
+    queryFn: () => fetchLocations(companyId),
+    enabled: !!companyId,
   });
 
   const { data: equipmentList = [] } = useQuery({
@@ -181,8 +144,6 @@ export default function EditMissionPage() {
         latitude: mission.latitude || undefined,
         longitude: mission.longitude || undefined,
         callDate: mission.callDate ? new Date(mission.callDate).toISOString().slice(0, 16) : "",
-        customerId: mission.customerId || undefined,
-        contractId: mission.contractId || undefined,
         patientId: mission.patientId || undefined,
         locationId: mission.locationId || undefined,
         notes: mission.notes || "",
@@ -215,6 +176,26 @@ export default function EditMissionPage() {
     setFormData(prev => ({ ...prev, equipment: updated }));
   };
 
+  // When patient is selected, set pickup address to patient's address
+  const handlePatientChange = (patientId: string) => {
+    const selectedPatient = patients.find((p) => p.id === patientId);
+    setFormData((prev) => ({
+      ...prev,
+      patientId: patientId || undefined,
+      pickupAddress: selectedPatient?.address || prev.pickupAddress,
+    }));
+  };
+
+  // When location is selected, set destination to location's address
+  const handleLocationChange = (locationId: string) => {
+    const selectedLocation = locations.find((l) => l.id === locationId);
+    setFormData((prev) => ({
+      ...prev,
+      locationId: locationId || undefined,
+      destination: selectedLocation?.address || prev.destination,
+    }));
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -235,8 +216,6 @@ export default function EditMissionPage() {
       latitude: formData.latitude,
       longitude: formData.longitude,
       callDate: formData.callDate ? new Date(formData.callDate).toISOString() : undefined,
-      customerId: formData.customerId || undefined,
-      contractId: formData.contractId || undefined,
       patientId: formData.patientId || undefined,
       locationId: formData.locationId || undefined,
       notes: formData.notes || undefined,
@@ -347,51 +326,6 @@ export default function EditMissionPage() {
                   />
                 </div>
 
-                {/* Customer */}
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Customer
-                  </label>
-                  <select
-                    value={formData.customerId || ""}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        customerId: e.target.value || undefined,
-                        contractId: undefined
-                      });
-                    }}
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                  >
-                    <option value="">Select customer</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.code && `(${c.code})`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Contract */}
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Contract
-                  </label>
-                  <select
-                    value={formData.contractId || ""}
-                    onChange={(e) => setFormData({ ...formData, contractId: e.target.value || undefined })}
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    disabled={!formData.customerId}
-                  >
-                    <option value="">Select contract</option>
-                    {contracts.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.reference} - {c.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Patient */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
@@ -399,7 +333,7 @@ export default function EditMissionPage() {
                   </label>
                   <select
                     value={formData.patientId || ""}
-                    onChange={(e) => setFormData({ ...formData, patientId: e.target.value || undefined })}
+                    onChange={(e) => handlePatientChange(e.target.value)}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   >
                     <option value="">Select patient</option>
@@ -418,7 +352,7 @@ export default function EditMissionPage() {
                   </label>
                   <select
                     value={formData.locationId || ""}
-                    onChange={(e) => setFormData({ ...formData, locationId: e.target.value || undefined })}
+                    onChange={(e) => handleLocationChange(e.target.value)}
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   >
                     <option value="">Select location</option>

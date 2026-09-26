@@ -136,7 +136,6 @@ export default function UsersPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [dialogAction, setDialogAction] = useState<"delete" | "soft-delete">("delete");
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -182,15 +181,12 @@ export default function UsersPage() {
     router.push(`/users/${user.id}`);
   };
 
-  const handleDelete = (user: User) => {
-    setSelectedUser(user);
-    setDialogAction("delete");
-    setDialogOpen(true);
+  const handlePermissions = (user: User) => {
+    router.push(`/users/${user.id}/permissions`);
   };
 
-  const handleSoftDelete = (user: User) => {
+  const handleDelete = (user: User) => {
     setSelectedUser(user);
-    setDialogAction("soft-delete");
     setDialogOpen(true);
   };
 
@@ -198,26 +194,17 @@ export default function UsersPage() {
     if (!selectedUser) return;
 
     try {
-      let res;
-      if (dialogAction === "delete") {
-        res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}`,
-          { method: "DELETE" }
-        );
-      } else {
-        res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/soft-delete`,
-          { method: "PATCH" }
-        );
-      }
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/soft-delete`,
+        { method: "PATCH" }
+      );
 
       if (!res.ok) throw new Error("Action failed");
 
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      const actionText = dialogAction === "delete" ? "deleted" : "soft deleted";
-      showToast(`✅ User ${selectedUser.email} ${actionText}`, "success");
+      showToast(`✅ User ${selectedUser.email} deleted`, "success");
     } catch (err) {
-      showToast(`❌ Failed to ${dialogAction} user`, "error");
+      showToast(`❌ Failed to delete user`, "error");
     } finally {
       setDialogOpen(false);
       setSelectedUser(null);
@@ -335,7 +322,7 @@ export default function UsersPage() {
     {
       id: "actions",
       header: "Actions",
-      size: 250,
+      size: 300,
       Cell: ({ row }) => (
         <div className="flex gap-1 flex-wrap">
           <button
@@ -350,6 +337,12 @@ export default function UsersPage() {
           >
             Edit
           </button>
+          <button
+            className="px-2 py-1 bg-purple-500 text-white rounded-md text-xs hover:bg-purple-600"
+            onClick={() => handlePermissions(row.original)}
+          >
+            Permissions
+          </button>
           {row.original.isDeleted ? (
             <button
               className="px-2 py-1 bg-green-500 text-white rounded-md text-xs hover:bg-green-600"
@@ -358,20 +351,12 @@ export default function UsersPage() {
               Restore
             </button>
           ) : (
-            <>
-              <button
-                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
-                onClick={() => handleSoftDelete(row.original)}
-              >
-                Soft Delete
-              </button>
-              <button
-                className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
-                onClick={() => handleDelete(row.original)}
-              >
-                Delete
-              </button>
-            </>
+            <button
+              className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
+              onClick={() => handleDelete(row.original)}
+            >
+              Delete
+            </button>
           )}
         </div>
       ),
@@ -522,26 +507,14 @@ export default function UsersPage() {
             <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
             <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
               <Dialog.Title className="text-lg font-bold">
-                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Soft Delete"}
+                Confirm Delete
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                {dialogAction === "delete" ? (
-                  <>
-                    Are you sure you want to permanently delete user{" "}
-                    <span className="font-semibold">
-                      {selectedUser?.email ?? ""}
-                    </span>
-                    ? This action cannot be undone.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to soft delete user{" "}
-                    <span className="font-semibold">
-                      {selectedUser?.email ?? ""}
-                    </span>
-                    ? The user can be restored later.
-                  </>
-                )}
+                Are you sure you want to delete user{" "}
+                <span className="font-semibold">
+                  {selectedUser?.email ?? ""}
+                </span>
+                ? The user can be restored later.
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -552,10 +525,9 @@ export default function UsersPage() {
                 </button>
                 <button
                   onClick={confirmAction}
-                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete" ? "bg-red-500 hover:bg-red-600" : "bg-orange-500 hover:bg-orange-600"
-                    }`}
+                  className="px-4 py-2 rounded-md text-white bg-red-500 hover:bg-red-600"
                 >
-                  {dialogAction === "delete" ? "Delete" : "Soft Delete"}
+                  Delete
                 </button>
               </div>
             </Dialog.Content>
