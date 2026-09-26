@@ -49,6 +49,10 @@ export class AuthController {
       role: user.role,
       companyId: user.companyId ?? null,
       companyName: user.company?.name ?? null,
+      permissions: user.userPermissions.map((up) => ({
+        id: up.permission.id,
+        name: up.permission.name,
+      })),
     };
   }
 }

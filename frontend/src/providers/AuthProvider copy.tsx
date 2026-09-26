@@ -7,18 +7,14 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useMemo,
   ReactNode,
 } from "react";
-import { notFound, usePathname } from "next/navigation";
 import {
   AuthUser,
   getToken,
   fetchCurrentUser,
   logout as authLogout,
 } from "@/lib/api/auth";
-import { hasPermission as checkPermission } from "@/lib/permissions";
-import { findRouteRule } from "@/lib/routePermissions";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -27,10 +23,6 @@ interface AuthContextValue {
   setUser: (user: AuthUser | null) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
-  hasPermission: (
-    required?: string | string[],
-    mode?: "any" | "all"
-  ) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -40,11 +32,9 @@ const AuthContext = createContext<AuthContextValue>({
   setUser: () => { },
   logout: () => { },
   refreshUser: async () => { },
-  hasPermission: () => false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     })();
 
+    // Sync logout across tabs
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "access_token") {
         if (!e.newValue) {
@@ -81,53 +72,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, [refreshUser]);
 
-  const logout = useCallback(() => {
+  const logout = () => {
     authLogout();
     setUser(null);
     setIsAuthenticated(false);
-  }, []);
+  };
 
-  const hasPermission = useCallback(
-    (required?: string | string[], mode: "any" | "all" = "any") =>
-      checkPermission(user?.permissions, required, mode),
-    [user?.permissions]
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isLoading,
+        setUser,
+        logout,
+        refreshUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
   );
-
-  // ---------------------------------------------------------------
-  // 🌟 GLOBAL ROUTE GUARD — checks every navigation automatically
-  // ---------------------------------------------------------------
-  useEffect(() => {
-    if (isLoading) return;                 // still loading user
-    if (!user) return;                     // not logged in → handled elsewhere
-
-    const rule = findRouteRule(pathname);
-    if (!rule || !rule.permission) return; // public route
-
-    const allowed = checkPermission(
-      user.permissions,
-      rule.permission,
-      rule.mode ?? "any"
-    );
-
-    if (!allowed) {
-      notFound();                          // renders app/not-found.tsx
-    }
-  }, [pathname, user, isLoading]);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      isAuthenticated,
-      isLoading,
-      setUser,
-      logout,
-      refreshUser,
-      hasPermission,
-    }),
-    [user, isAuthenticated, isLoading, logout, refreshUser, hasPermission]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

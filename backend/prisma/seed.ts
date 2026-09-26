@@ -1,3 +1,4 @@
+// backend/prisma/seed.ts
 import {
   PrismaClient,
   PricingType,
@@ -18,10 +19,217 @@ import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+// ===================== PERMISSION CATALOG =====================
+const PERMISSIONS: { name: string; description: string; group: string }[] = [
+  // Missions
+  { name: 'missions.read', description: 'View missions', group: 'missions' },
+  {
+    name: 'missions.create',
+    description: 'Create missions',
+    group: 'missions',
+  },
+  {
+    name: 'missions.assign',
+    description: 'Assign vehicles/staff to missions',
+    group: 'missions',
+  },
+  {
+    name: 'missions.update',
+    description: 'Update mission status/details',
+    group: 'missions',
+  },
+  {
+    name: 'missions.cancel',
+    description: 'Cancel missions',
+    group: 'missions',
+  },
+  {
+    name: 'missions.delete',
+    description: 'Delete missions',
+    group: 'missions',
+  },
+  // Vehicles
+  { name: 'vehicles.read', description: 'View vehicles', group: 'vehicles' },
+  {
+    name: 'vehicles.manage',
+    description: 'Create/edit/delete vehicles',
+    group: 'vehicles',
+  },
+  {
+    name: 'vehicles.gps',
+    description: 'View GPS positions',
+    group: 'vehicles',
+  },
+  // Staff
+  { name: 'staff.read', description: 'View staff members', group: 'staff' },
+  {
+    name: 'staff.manage',
+    description: 'Create/edit staff members',
+    group: 'staff',
+  },
+  {
+    name: 'staff.schedules.read',
+    description: 'View staff schedules',
+    group: 'staff',
+  },
+  {
+    name: 'staff.schedules.manage',
+    description: 'Manage staff schedules/shifts',
+    group: 'staff',
+  },
+  {
+    name: 'staff.attendance.edit',
+    description: 'Edit staff attendance/check-in',
+    group: 'staff',
+  },
+  // Customers / Contracts
+  { name: 'customers.read', description: 'View customers', group: 'customers' },
+  {
+    name: 'customers.manage',
+    description: 'Create/edit customers',
+    group: 'customers',
+  },
+  { name: 'contracts.read', description: 'View contracts', group: 'contracts' },
+  {
+    name: 'contracts.manage',
+    description: 'Create/edit contracts',
+    group: 'contracts',
+  },
+  // Patients / Locations
+  { name: 'patients.read', description: 'View patients', group: 'patients' },
+  {
+    name: 'patients.manage',
+    description: 'Create/edit patients',
+    group: 'patients',
+  },
+  { name: 'locations.read', description: 'View locations', group: 'locations' },
+  {
+    name: 'locations.manage',
+    description: 'Create/edit locations',
+    group: 'locations',
+  },
+  // Equipment
+  { name: 'equipment.read', description: 'View equipment', group: 'equipment' },
+  {
+    name: 'equipment.manage',
+    description: 'Manage equipment',
+    group: 'equipment',
+  },
+  // Invoices / Billing
+  { name: 'invoices.read', description: 'View invoices', group: 'billing' },
+  {
+    name: 'invoices.generate',
+    description: 'Generate invoices',
+    group: 'billing',
+  },
+  {
+    name: 'invoices.manage',
+    description: 'Edit/void invoices',
+    group: 'billing',
+  },
+  {
+    name: 'rates.manage',
+    description: 'Manage distance rates & services',
+    group: 'billing',
+  },
+  // Services
+  { name: 'services.read', description: 'View services', group: 'services' },
+  {
+    name: 'services.manage',
+    description: 'Create/edit services',
+    group: 'services',
+  },
+  // Users / Admin
+  { name: 'users.read', description: 'View users', group: 'admin' },
+  {
+    name: 'users.manage',
+    description: 'Create/edit users & permissions',
+    group: 'admin',
+  },
+  {
+    name: 'company.read',
+    description: 'View company settings',
+    group: 'admin',
+  },
+  {
+    name: 'company.manage',
+    description: 'Edit company settings',
+    group: 'admin',
+  },
+  { name: 'audit.read', description: 'View audit logs', group: 'admin' },
+];
+
+// ===================== ROLE → PERMISSION MAP =====================
+const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  ADMIN: PERMISSIONS.map((p) => p.name), // full access
+
+  MANAGER: [
+    'missions.read',
+    'missions.create',
+    'missions.assign',
+    'missions.update',
+    'missions.cancel',
+    'vehicles.read',
+    'vehicles.gps',
+    'staff.read',
+    'staff.schedules.read',
+    'staff.schedules.manage',
+    'customers.read',
+    'contracts.read',
+    'patients.read',
+    'locations.read',
+    'equipment.read',
+    'invoices.read',
+    'invoices.generate',
+    'services.read',
+    'company.read',
+  ],
+
+  SUPERVISOR: [
+    'missions.read',
+    'missions.create',
+    'missions.assign',
+    'missions.update',
+    'vehicles.read',
+    'vehicles.gps',
+    'staff.read',
+    'staff.schedules.read',
+    'staff.attendance.edit',
+    'customers.read',
+    'contracts.read',
+    'patients.read',
+    'locations.read',
+    'equipment.read',
+    'services.read',
+  ],
+
+  DISPATCHER: [
+    'missions.read',
+    'missions.create',
+    'missions.assign',
+    'missions.update',
+    'missions.cancel',
+    'vehicles.read',
+    'vehicles.gps',
+    'staff.read',
+    'staff.schedules.read',
+    'customers.read',
+    'patients.read',
+    'locations.read',
+    'services.read',
+  ],
+
+  STAFF: ['missions.read', 'vehicles.read', 'staff.schedules.read'],
+};
+
+// ===================== MAIN =====================
 async function main() {
   console.log('Cleaning database...');
 
   // Clean in correct order (respect foreign keys)
+  await prisma.userPermission.deleteMany();
+  await prisma.rolePermission.deleteMany();
+  await prisma.permission.deleteMany();
   await prisma.assignmentStaff.deleteMany();
   await prisma.missionAssignment.deleteMany();
   await prisma.missionEquipment.deleteMany();
@@ -53,6 +261,67 @@ async function main() {
 
   console.log('Database cleaned.');
 
+  // ==================== PERMISSIONS ====================
+  console.log('Seeding permissions...');
+  for (const p of PERMISSIONS) {
+    await prisma.permission.upsert({
+      where: { name: p.name },
+      update: { description: p.description, group: p.group },
+      create: p,
+    });
+  }
+  console.log(`✔ ${PERMISSIONS.length} permissions ensured`);
+
+  // ==================== ROLE → PERMISSION MAPPINGS ====================
+  for (const [roleName, permNames] of Object.entries(ROLE_PERMISSIONS) as [
+    UserRole,
+    string[],
+  ][]) {
+    for (const permName of permNames) {
+      const perm = await prisma.permission.findUnique({
+        where: { name: permName },
+      });
+      if (!perm) continue;
+
+      await prisma.rolePermission.upsert({
+        where: { roleName_permissionId: { roleName, permissionId: perm.id } },
+        update: {},
+        create: { roleName, permissionId: perm.id },
+      });
+    }
+  }
+  console.log('✔ Role → permission mappings ensured');
+
+  // Cache all permissions by name for fast lookup later
+  const allPermissions = await prisma.permission.findMany();
+  const permissionByName = new Map(allPermissions.map((p) => [p.name, p]));
+
+  // ==================== HELPER: grant explicit user permissions ====================
+  /**
+   * Grants explicit UserPermission rows for a user based on their role mapping.
+   * This mirrors the role permissions at the user level so you can test
+   * role ∪ user override behavior and per-user revocation.
+   */
+  async function grantUserPermissionsFromRole(userId: string, role: UserRole) {
+    const permNames = ROLE_PERMISSIONS[role] ?? [];
+    for (const permName of permNames) {
+      const perm = permissionByName.get(permName);
+      if (!perm) continue;
+
+      await prisma.userPermission.upsert({
+        where: {
+          userId_permissionId: { userId, permissionId: perm.id },
+        },
+        update: { revokedAt: null },
+        create: {
+          userId,
+          permissionId: perm.id,
+          grantedById: userId, // self-granted on seed; change if you want an admin grantor
+        },
+      });
+    }
+  }
+
   const password = await bcrypt.hash('Admin123!', 10);
 
   // ==================== VEHICLE TYPES ====================
@@ -65,9 +334,7 @@ async function main() {
 
   const vehicleTypes = [];
   for (const name of vehicleTypeNames) {
-    const vt = await prisma.vehicleType.create({
-      data: { name },
-    });
+    const vt = await prisma.vehicleType.create({ data: { name } });
     vehicleTypes.push(vt);
   }
 
@@ -125,59 +392,70 @@ async function main() {
 
     createdCompanies.push(company);
 
-    // ==================== USERS ====================
-    await prisma.user.createMany({
-      data: [
-        {
-          companyId: company.id,
-          email: `admin@${c.code.toLowerCase()}.tn`,
-          password,
-          firstName: 'Admin',
-          lastName: c.address,
-          telephone: '+21620000001',
-          cin: Math.floor(
-            100000000000 + Math.random() * 900000000000,
-          ).toString(),
-          role: UserRole.ADMIN,
-        },
-        {
-          companyId: company.id,
-          email: `dispatcher@${c.code.toLowerCase()}.tn`,
-          password,
-          firstName: 'Ali',
-          lastName: 'Dispatcher',
-          telephone: '+21620000002',
-          cin: Math.floor(
-            100000000000 + Math.random() * 900000000000,
-          ).toString(),
-          role: UserRole.DISPATCHER,
-        },
-        {
-          companyId: company.id,
-          email: `supervisor@${c.code.toLowerCase()}.tn`,
-          password,
-          firstName: 'Mohamed',
-          lastName: 'Supervisor',
-          telephone: '+21620000003',
-          cin: Math.floor(
-            100000000000 + Math.random() * 900000000000,
-          ).toString(),
-          role: UserRole.SUPERVISOR,
-        },
-        {
-          companyId: company.id,
-          email: `manager@${c.code.toLowerCase()}.tn`,
-          password,
-          firstName: 'Ahmed',
-          lastName: 'Manager',
-          telephone: '+21620000004',
-          cin: Math.floor(
-            100000000000 + Math.random() * 900000000000,
-          ).toString(),
-          role: UserRole.MANAGER,
-        },
-      ],
+    // ==================== USERS (named so we can grant explicit permissions) ====================
+    const adminUserRecord = await prisma.user.create({
+      data: {
+        companyId: company.id,
+        email: `admin@${c.code.toLowerCase()}.tn`,
+        password,
+        firstName: 'Admin',
+        lastName: c.address,
+        telephone: '+21620000001',
+        cin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+        role: UserRole.ADMIN,
+      },
     });
+
+    const dispatcherUserRecord = await prisma.user.create({
+      data: {
+        companyId: company.id,
+        email: `dispatcher@${c.code.toLowerCase()}.tn`,
+        password,
+        firstName: 'Ali',
+        lastName: 'Dispatcher',
+        telephone: '+21620000002',
+        cin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+        role: UserRole.DISPATCHER,
+      },
+    });
+
+    const supervisorUserRecord = await prisma.user.create({
+      data: {
+        companyId: company.id,
+        email: `supervisor@${c.code.toLowerCase()}.tn`,
+        password,
+        firstName: 'Mohamed',
+        lastName: 'Supervisor',
+        telephone: '+21620000003',
+        cin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+        role: UserRole.SUPERVISOR,
+      },
+    });
+
+    const managerUserRecord = await prisma.user.create({
+      data: {
+        companyId: company.id,
+        email: `manager@${c.code.toLowerCase()}.tn`,
+        password,
+        firstName: 'Ahmed',
+        lastName: 'Manager',
+        telephone: '+21620000004',
+        cin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+        role: UserRole.MANAGER,
+      },
+    });
+
+    // Grant explicit user-level permissions based on each role
+    await grantUserPermissionsFromRole(adminUserRecord.id, UserRole.ADMIN);
+    await grantUserPermissionsFromRole(
+      dispatcherUserRecord.id,
+      UserRole.DISPATCHER,
+    );
+    await grantUserPermissionsFromRole(
+      supervisorUserRecord.id,
+      UserRole.SUPERVISOR,
+    );
+    await grantUserPermissionsFromRole(managerUserRecord.id, UserRole.MANAGER);
 
     // ==================== VEHICLES ====================
     const vehicles = [];
@@ -302,6 +580,9 @@ async function main() {
           companyId: company.id,
         },
       });
+
+      // Grant explicit user-level permissions based on STAFF role
+      await grantUserPermissionsFromRole(user.id, UserRole.STAFF);
 
       const staff = await prisma.staffMember.create({
         data: {
@@ -504,10 +785,7 @@ async function main() {
 
     for (const eqData of equipmentData) {
       const equipment = await prisma.equipment.create({
-        data: {
-          ...eqData,
-          companyId: company.id,
-        },
+        data: { ...eqData, companyId: company.id },
       });
       equipmentItems.push(equipment);
     }
@@ -553,10 +831,7 @@ async function main() {
 
     for (const cData of customerData) {
       const customer = await prisma.customer.create({
-        data: {
-          ...cData,
-          companyId: company.id,
-        },
+        data: { ...cData, companyId: company.id },
       });
       customers.push(customer);
     }
@@ -651,10 +926,7 @@ async function main() {
 
     for (const pData of patientData) {
       const patient = await prisma.patient.create({
-        data: {
-          ...pData,
-          companyId: company.id,
-        },
+        data: { ...pData, companyId: company.id },
       });
       patients.push(patient);
     }
@@ -759,10 +1031,7 @@ async function main() {
 
     for (const locData of locationData) {
       const location = await prisma.location.create({
-        data: {
-          ...locData,
-          companyId: company.id,
-        },
+        data: { ...locData, companyId: company.id },
       });
       locations.push(location);
     }
@@ -786,7 +1055,6 @@ async function main() {
       MissionPriority.CRITICAL,
     ];
 
-    // Create 10 missions per company
     for (let i = 0; i < 10; i++) {
       const customer = customers[i % customers.length];
       const contract = contracts[i % contracts.length];
@@ -796,11 +1064,9 @@ async function main() {
       const statusIndex = i % missionStatuses.length;
       const priorityIndex = i % priorities.length;
 
-      // Generate realistic pickup location
       const pickupLat = 36.7 + (Math.random() - 0.5) * 0.5;
       const pickupLng = 10.1 + (Math.random() - 0.5) * 0.5;
 
-      // Calculate mission dates
       const callDate = new Date(
         Date.now() - i * 3600000 - Math.random() * 3600000,
       );
@@ -833,11 +1099,11 @@ async function main() {
           destination: location.address || `${location.name}, Tunisia`,
           latitude: pickupLat,
           longitude: pickupLng,
-          callDate: callDate,
-          dispatchedAt: dispatchedAt,
-          arrivedSceneAt: arrivedSceneAt,
-          transportedAt: transportedAt,
-          completedAt: completedAt,
+          callDate,
+          dispatchedAt,
+          arrivedSceneAt,
+          transportedAt,
+          completedAt,
           customerId: customer.id,
           contractId: contract.id,
           patientId: patient.id,
@@ -848,8 +1114,7 @@ async function main() {
       });
 
       // ==================== MISSION EQUIPMENT ====================
-      // Assign 2-3 equipment items to each mission
-      const numEquipment = 2 + Math.floor(Math.random() * 2); // 2-3 items
+      const numEquipment = 2 + Math.floor(Math.random() * 2);
       const shuffledEquipment = [...equipmentItems].sort(
         () => Math.random() - 0.5,
       );
@@ -860,7 +1125,7 @@ async function main() {
           data: {
             missionId: mission.id,
             equipmentId: equipment.id,
-            quantity: 1 + Math.floor(Math.random() * 3), // 1-3 quantity
+            quantity: 1 + Math.floor(Math.random() * 3),
             assignedAt: new Date(
               callDate.getTime() + 60000 + Math.random() * 300000,
             ),
@@ -888,23 +1153,17 @@ async function main() {
           },
         });
 
-        // ==================== ASSIGN STAFF ====================
         const staffStartIdx = (i * 2) % staffMembers.length;
         for (let j = 0; j < 2; j++) {
           const staffIdx = (staffStartIdx + j) % staffMembers.length;
           const staff = staffMembers[staffIdx];
 
-          // Check if staff has schedule
           const schedule = await prisma.vehicleStaffSchedule.findFirst({
             where: {
               vehicleId: vehicle.id,
               staffId: staff.id,
-              shiftStart: {
-                lte: new Date(),
-              },
-              shiftEnd: {
-                gte: new Date(),
-              },
+              shiftStart: { lte: new Date() },
+              shiftEnd: { gte: new Date() },
               status: ScheduleStatus.ACTIVE,
             },
           });
@@ -996,7 +1255,7 @@ async function main() {
         });
       }
 
-      // ==================== INVOICE (for completed missions) ====================
+      // ==================== INVOICE (completed missions) ====================
       if (statusIndex === 7) {
         const invoice = await prisma.invoice.create({
           data: {
@@ -1017,7 +1276,6 @@ async function main() {
           },
         });
 
-        // Invoice lines
         await prisma.invoiceLine.createMany({
           data: [
             {
@@ -1061,6 +1319,9 @@ async function main() {
 
   // ==================== FINAL STATISTICS ====================
   const stats = {
+    permissions: await prisma.permission.count(),
+    rolePermissions: await prisma.rolePermission.count(),
+    userPermissions: await prisma.userPermission.count(),
     companies: await prisma.company.count(),
     users: await prisma.user.count(),
     vehicleTypes: await prisma.vehicleType.count(),
@@ -1089,6 +1350,9 @@ async function main() {
   console.log('\n===============================');
   console.log('✅ Seed completed successfully');
   console.log('===============================');
+  console.log(`Permissions            : ${stats.permissions}`);
+  console.log(`Role Permissions       : ${stats.rolePermissions}`);
+  console.log(`User Permissions       : ${stats.userPermissions}`);
   console.log(`Companies              : ${stats.companies}`);
   console.log(`Users                  : ${stats.users}`);
   console.log(`Vehicle Types          : ${stats.vehicleTypes}`);
