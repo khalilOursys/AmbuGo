@@ -11,9 +11,10 @@ import { MissionModule } from './mission/mission.module';
 import { StaffModule } from './staff/staff.module';
 import { LocationModule } from './location/location.module';
 import { PatientModule } from './patient/patient.module';
+import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, CompaniesModule, ServicesModule, EquipmentModule, VehiclesModule, MissionModule, StaffModule, LocationModule, PatientModule],
+  imports: [AuthModule, UsersModule, CompaniesModule, ServicesModule, EquipmentModule, VehiclesModule, MissionModule, StaffModule, LocationModule, PatientModule, PermissionsModule],
   controllers: [AppController],
   providers: [PrismaService],
 })

@@ -38,6 +38,7 @@ export class AuthService {
       role: user.role,
       companyId: user.companyId,
     };
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -48,6 +49,7 @@ export class AuthService {
         role: user.role,
         companyId: user.companyId,
         companyName: user.company?.name,
+        ...(user.staffMember && { staffMember: user.staffMember }),
       },
     };
   }

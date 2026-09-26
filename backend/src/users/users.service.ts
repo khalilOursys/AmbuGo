@@ -11,10 +11,14 @@ import { UserFilterDto } from './dto/user-filter.dto';
 import * as bcrypt from 'bcryptjs';
 import { UserRole, User } from '@prisma/client';
 import { UpdateUserDto } from './dto/UpdateUserDto';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissionsService: PermissionsService,
+  ) {}
 
   // ==================== INITIALIZATION ====================
 
@@ -219,6 +223,11 @@ export class UsersService {
         isDeleted: false,
       },
       include: {
+        userPermissions: {
+          include: {
+            permission: true,
+          },
+        },
         company: {
           select: {
             id: true,
@@ -239,6 +248,7 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
+        staffMember: true,
         company: {
           select: {
             id: true,
@@ -355,13 +365,17 @@ export class UsersService {
 
   // ==================== USER MANAGEMENT ====================
 
+  // replace updateRole
   async updateRole(id: string, role: UserRole) {
     await this.findOne(id);
 
-    return await this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { role },
     });
+
+    await this.permissionsService.grantRolePermissionsToUser(id);
+    return updated;
   }
 
   async changePassword(

@@ -1,15 +1,21 @@
-// lib/auth.ts
+// lib/api/auth.ts
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // ---------------- Types ----------------
+export interface Permission {
+  id: number;
+  name: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   role: string;
-  companyId?: string;
-  companyName?: string;
+  companyId?: string | null;
+  companyName?: string | null;
+  permissions: Permission[];
 }
 
 export interface LoginCredentials {
@@ -88,7 +94,7 @@ export const login = async (
   }
 
   const data: AuthResponse = await response.json();
-  setToken(data.access_token); // ONLY token in localStorage
+  setToken(data.access_token);
   return data;
 };
 

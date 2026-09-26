@@ -181,6 +181,8 @@ model User {
 
   auditLogs  AuditLog[]
   notifications Notification[]
+  userPermissions  UserPermission[] @relation("UserPermissionUser")
+  grantedPermissions UserPermission[] @relation("PermissionGrantedBy")
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt @default(now())
@@ -219,7 +221,48 @@ model Customer {
   @@index([name])
   @@index([companyId])
 }
+/* ===================== PERMISSIONS ===================== */
 
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "missions.manage", "vehicles.read"
+  description String?
+  group       String?  // optional group: "missions", "vehicles", "staff", ...
+  createdAt   DateTime @default(now())
+
+  roleMappings RolePermission[]
+  userMappings UserPermission[]
+
+  @@index([name])
+  @@index([group])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleName     UserRole
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleName, permissionId])
+  @@index([roleName])
+}
+
+model UserPermission {
+  id           String     @id @default(uuid())
+  user         User       @relation("UserPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+  grantedBy    User?      @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  grantedById  String?
+  grantedAt    DateTime   @default(now())
+  revokedAt    DateTime?
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+}
 // ===================== CONTRACT =====================
 model Contract {
   id          String @id @default(uuid())

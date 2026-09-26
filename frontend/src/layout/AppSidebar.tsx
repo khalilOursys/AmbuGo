@@ -41,6 +41,8 @@ import {
   MapPinned,
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
+import { hasPermission } from "@/lib/permissions";
+import type { Permission } from "@/lib/api/auth";
 
 type SubItem = {
   name: string;
@@ -48,6 +50,7 @@ type SubItem = {
   icon?: React.ReactNode;
   pro?: boolean;
   new?: boolean;
+  permission?: string | string[];
 };
 
 type NavItem = {
@@ -55,7 +58,26 @@ type NavItem = {
   icon: React.ReactNode;
   path?: string;
   subItems?: SubItem[];
+  permission?: string | string[];
 };
+
+function filterByPermission(
+  items: NavItem[],
+  perms: Permission[] | undefined
+): NavItem[] {
+  return items
+    .map((nav) => {
+      if (!nav.subItems) {
+        return hasPermission(perms, nav.permission) ? nav : null;
+      }
+      const subs = nav.subItems.filter((s) =>
+        hasPermission(perms, s.permission)
+      );
+      if (subs.length === 0) return null;
+      return { ...nav, subItems: subs };
+    })
+    .filter(Boolean) as NavItem[];
+}
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -64,11 +86,13 @@ const AppSidebar: React.FC = () => {
 
   const navItems: NavItem[] = useMemo(() => {
     const cid = user?.companyId;
+    const perms = user?.permissions;
 
     if (isLoading) return [];
 
+    // ---------- No company ----------
     if (!cid) {
-      return [
+      const items: NavItem[] = [
         {
           name: "Companies",
           icon: <Building2 />,
@@ -77,12 +101,14 @@ const AppSidebar: React.FC = () => {
               name: "All Companies",
               path: "/companies",
               icon: <List className="w-4 h-4" />,
+              permission: "companies.read",
             },
             {
               name: "Add Company",
               path: "/companies/add",
               icon: <PlusCircle className="w-4 h-4" />,
               new: true,
+              permission: "companies.manage",
             },
           ],
         },
@@ -94,19 +120,23 @@ const AppSidebar: React.FC = () => {
               name: "All Users",
               path: "/users",
               icon: <List className="w-4 h-4" />,
+              permission: "users.read",
             },
             {
               name: "Add User",
               path: "/users/add",
               icon: <UserPlus className="w-4 h-4" />,
+              permission: "users.manage",
             },
           ],
         },
         { name: "Profile", icon: <UserCircle />, path: "/profile" },
       ];
+      return filterByPermission(items, perms);
     }
 
-    return [
+    // ---------- With company ----------
+    const items: NavItem[] = [
       {
         name: "Companies",
         icon: <Building2 />,
@@ -115,11 +145,13 @@ const AppSidebar: React.FC = () => {
             name: "Overview",
             path: `/companies/${cid}`,
             icon: <Building className="w-4 h-4" />,
+            permission: "companies.read",
           },
           {
             name: "Settings",
             path: `/companies/${cid}/settings`,
             icon: <Settings className="w-4 h-4" />,
+            permission: "companies.update",
           },
         ],
       },
@@ -131,17 +163,20 @@ const AppSidebar: React.FC = () => {
             name: "All Equipment",
             path: `/equipment/${cid}`,
             icon: <Boxes className="w-4 h-4" />,
+            permission: "equipment.read",
           },
           {
             name: "Add Equipment",
             path: `/equipment/${cid}/add`,
             icon: <PlusCircle className="w-4 h-4" />,
             new: true,
+            permission: "equipment.manage",
           },
           {
             name: "Categories",
             path: `/equipment/${cid}/categories`,
             icon: <Package className="w-4 h-4" />,
+            permission: "equipment.categories",
           },
         ],
       },
@@ -153,16 +188,19 @@ const AppSidebar: React.FC = () => {
             name: "All Locations",
             path: `/locations/${cid}`,
             icon: <List className="w-4 h-4" />,
+            permission: "locations.read",
           },
           {
             name: "Add Location",
             path: `/locations/${cid}/add`,
             icon: <PlusCircle className="w-4 h-4" />,
+            permission: "locations.manage",
           },
           {
             name: "Map View",
             path: `/locations/${cid}/map`,
             icon: <MapPinned className="w-4 h-4" />,
+            permission: "locations.map",
           },
         ],
       },
@@ -174,28 +212,33 @@ const AppSidebar: React.FC = () => {
             name: "All Missions",
             path: `/missions/${cid}`,
             icon: <List className="w-4 h-4" />,
+            permission: "missions.read",
           },
           {
             name: "New Mission",
             path: `/missions/${cid}/add`,
             icon: <PlusCircle className="w-4 h-4" />,
             new: true,
+            permission: "missions.manage",
           },
           {
             name: "Schedule",
             path: `/missions/${cid}/schedule`,
             icon: <Calendar className="w-4 h-4" />,
+            permission: "missions.schedule",
           },
           {
             name: "Routes",
             path: `/missions/${cid}/routes`,
             icon: <Route className="w-4 h-4" />,
+            permission: "missions.routes",
           },
           {
             name: "Statistics",
             path: `/missions/${cid}/stats`,
             icon: <BarChart3 className="w-4 h-4" />,
             pro: true,
+            permission: "missions.stats",
           },
         ],
       },
@@ -207,16 +250,19 @@ const AppSidebar: React.FC = () => {
             name: "All Patients",
             path: `/patients/${cid}`,
             icon: <List className="w-4 h-4" />,
+            permission: "patients.read",
           },
           {
             name: "Add Patient",
             path: `/patients/${cid}/add`,
             icon: <UserPlus className="w-4 h-4" />,
+            permission: "patients.manage",
           },
           {
             name: "Medical Records",
             path: `/patients/${cid}/records`,
             icon: <FileText className="w-4 h-4" />,
+            permission: "patients.records",
           },
         ],
       },
@@ -228,11 +274,13 @@ const AppSidebar: React.FC = () => {
             name: "All Services",
             path: `/services/${cid}`,
             icon: <List className="w-4 h-4" />,
+            permission: "services.read",
           },
           {
             name: "Add Service",
             path: `/services/${cid}/add`,
             icon: <PlusCircle className="w-4 h-4" />,
+            permission: "services.manage",
           },
         ],
       },
@@ -244,22 +292,26 @@ const AppSidebar: React.FC = () => {
             name: "All Staff",
             path: `/staff/${cid}`,
             icon: <List className="w-4 h-4" />,
+            permission: "staff.read",
           },
           {
             name: "Add Staff",
             path: `/staff/${cid}/add`,
             icon: <UserPlus className="w-4 h-4" />,
             new: true,
+            permission: "staff.manage",
           },
           {
             name: "Schedules",
             path: `/staff/${cid}/schedules`,
             icon: <Calendar className="w-4 h-4" />,
+            permission: "staff.schedules",
           },
           {
             name: "Roles",
             path: `/staff/${cid}/roles`,
             icon: <ShieldCheck className="w-4 h-4" />,
+            permission: "staff.roles",
           },
         ],
       },
@@ -271,16 +323,19 @@ const AppSidebar: React.FC = () => {
             name: "All Vehicles",
             path: `/vehicles/${cid}`,
             icon: <Ambulance className="w-4 h-4" />,
+            permission: "vehicles.read",
           },
           {
             name: "Add Vehicle",
             path: `/vehicles/${cid}/add`,
             icon: <PlusCircle className="w-4 h-4" />,
+            permission: "vehicles.manage",
           },
           {
             name: "Maintenance",
             path: `/vehicles/${cid}/maintenance`,
             icon: <Wrench className="w-4 h-4" />,
+            permission: "vehicles.maintenance",
           },
         ],
       },
@@ -292,22 +347,28 @@ const AppSidebar: React.FC = () => {
             name: "All Users",
             path: "/users",
             icon: <List className="w-4 h-4" />,
+            permission: "users.read",
           },
           {
             name: "Add User",
             path: "/users/add",
             icon: <UserPlus className="w-4 h-4" />,
+            permission: "users.manage",
           },
           {
             name: "Permissions",
             path: "/users/permissions",
             icon: <ShieldCheck className="w-4 h-4" />,
+            permission: "users.manage",
+            /* permission: "users.permissions", */
           },
         ],
       },
       { name: "Profile", icon: <UserCircle />, path: "/profile" },
     ];
-  }, [user?.companyId, isLoading]);
+
+    return filterByPermission(items, perms);
+  }, [user?.companyId, user?.permissions, isLoading]);
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";
@@ -370,8 +431,8 @@ const AppSidebar: React.FC = () => {
               <button
                 onClick={() => handleSubmenuToggle(index, "main")}
                 className={`menu-item group ${isSubmenuOpen || hasActiveChild
-                    ? "menu-item-active"
-                    : "menu-item-inactive"
+                  ? "menu-item-active"
+                  : "menu-item-inactive"
                   } cursor-pointer ${!isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "lg:justify-start"
@@ -379,8 +440,8 @@ const AppSidebar: React.FC = () => {
               >
                 <span
                   className={`${isSubmenuOpen || hasActiveChild
-                      ? "menu-item-icon-active"
-                      : "menu-item-icon-inactive"
+                    ? "menu-item-icon-active"
+                    : "menu-item-icon-inactive"
                     }`}
                 >
                   {nav.icon}
@@ -400,14 +461,14 @@ const AppSidebar: React.FC = () => {
                 <Link
                   href={nav.path}
                   className={`menu-item group ${isActive(nav.path)
-                      ? "menu-item-active"
-                      : "menu-item-inactive"
+                    ? "menu-item-active"
+                    : "menu-item-inactive"
                     }`}
                 >
                   <span
                     className={`${isActive(nav.path)
-                        ? "menu-item-icon-active"
-                        : "menu-item-icon-inactive"
+                      ? "menu-item-icon-active"
+                      : "menu-item-icon-inactive"
                       }`}
                   >
                     {nav.icon}
@@ -437,15 +498,15 @@ const AppSidebar: React.FC = () => {
                       <Link
                         href={subItem.path}
                         className={`menu-dropdown-item flex items-center gap-2 ${isActive(subItem.path)
-                            ? "menu-dropdown-item-active"
-                            : "menu-dropdown-item-inactive"
+                          ? "menu-dropdown-item-active"
+                          : "menu-dropdown-item-inactive"
                           }`}
                       >
                         {subItem.icon && (
                           <span
                             className={`shrink-0 ${isActive(subItem.path)
-                                ? "text-brand-500"
-                                : "text-gray-400 dark:text-gray-500"
+                              ? "text-brand-500"
+                              : "text-gray-400 dark:text-gray-500"
                               }`}
                           >
                             {subItem.icon}
@@ -456,8 +517,8 @@ const AppSidebar: React.FC = () => {
                           {subItem.new && (
                             <span
                               className={`${isActive(subItem.path)
-                                  ? "menu-dropdown-badge-active"
-                                  : "menu-dropdown-badge-inactive"
+                                ? "menu-dropdown-badge-active"
+                                : "menu-dropdown-badge-inactive"
                                 } menu-dropdown-badge`}
                             >
                               new
@@ -466,8 +527,8 @@ const AppSidebar: React.FC = () => {
                           {subItem.pro && (
                             <span
                               className={`${isActive(subItem.path)
-                                  ? "menu-dropdown-badge-active"
-                                  : "menu-dropdown-badge-inactive"
+                                ? "menu-dropdown-badge-active"
+                                : "menu-dropdown-badge-inactive"
                                 } menu-dropdown-badge`}
                             >
                               pro
@@ -538,8 +599,8 @@ const AppSidebar: React.FC = () => {
             <div>
               <h2
                 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${!isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
+                  ? "lg:justify-center"
+                  : "justify-start"
                   }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
