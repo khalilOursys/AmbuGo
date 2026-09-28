@@ -104,6 +104,7 @@ export default function CompaniesPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"delete" | "restore">("delete");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -141,58 +142,47 @@ export default function CompaniesPage() {
     router.push(`/admin/companies/${company.id}`);
   };
 
-  const handleDelete = async (company: Company) => {
+  const handleDelete = (company: Company) => {
     setSelectedCompany(company);
+    setDialogAction("delete");
     setDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const handleRestore = (company: Company) => {
+    setSelectedCompany(company);
+    setDialogAction("restore");
+    setDialogOpen(true);
+  };
+
+  const confirmAction = async () => {
     if (!selectedCompany) return;
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/companies/${selectedCompany.id}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Delete failed");
+      const url =
+        dialogAction === "delete"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/companies/${selectedCompany.id}/soft-delete`
+          : `${process.env.NEXT_PUBLIC_API_URL}/companies/${selectedCompany.id}/restore`;
+
+      const res = await fetch(url, { method: "PATCH" });
+      if (!res.ok) throw new Error("Action failed");
 
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      showToast(`✅ Company ${selectedCompany.name} deleted`, "success");
+      showToast(
+        dialogAction === "delete"
+          ? `✅ Company ${selectedCompany.name} deleted`
+          : `✅ Company ${selectedCompany.name} restored`,
+        "success"
+      );
     } catch (err) {
-      showToast("❌ Failed to delete company", "error");
+      showToast(
+        dialogAction === "delete"
+          ? "❌ Failed to delete company"
+          : "❌ Failed to restore company",
+        "error"
+      );
     } finally {
       setDialogOpen(false);
       setSelectedCompany(null);
-    }
-  };
-
-  const handleSoftDelete = async (company: Company) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/companies/${company.id}/soft-delete`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Soft delete failed");
-
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
-      showToast(`✅ Company ${company.name} soft deleted`, "success");
-    } catch (err) {
-      showToast("❌ Failed to soft delete company", "error");
-    }
-  };
-
-  const handleRestore = async (company: Company) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/companies/${company.id}/restore`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Restore failed");
-
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
-      showToast(`✅ Company ${company.name} restored`, "success");
-    } catch (err) {
-      showToast("❌ Failed to restore company", "error");
     }
   };
 
@@ -212,7 +202,6 @@ export default function CompaniesPage() {
     setPage(0);
   };
 
-  // Fixed pagination handler
   const handlePaginationChange = (updater: any) => {
     const newState: PaginationState =
       typeof updater === "function"
@@ -275,6 +264,21 @@ export default function CompaniesPage() {
       },
     },
     {
+      accessorKey: "isDeleted",
+      header: "Status",
+      size: 90,
+      Cell: ({ cell }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs ${cell.getValue()
+            ? "bg-red-100 text-red-800"
+            : "bg-green-100 text-green-800"
+            }`}
+        >
+          {cell.getValue() ? "Deleted" : "Active"}
+        </span>
+      ),
+    },
+    {
       id: "actions",
       header: "Actions",
       size: 250,
@@ -300,20 +304,12 @@ export default function CompaniesPage() {
               Restore
             </button>
           ) : (
-            <>
-              <button
-                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
-                onClick={() => handleSoftDelete(row.original)}
-              >
-                Soft Delete
-              </button>
-              <button
-                className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
-                onClick={() => handleDelete(row.original)}
-              >
-                Delete
-              </button>
-            </>
+            <button
+              className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
+              onClick={() => handleDelete(row.original)}
+            >
+              Delete
+            </button>
           )}
         </div>
       ),
@@ -404,11 +400,11 @@ export default function CompaniesPage() {
           state={{
             isLoading,
             rowSelection,
-            pagination: { pageIndex: page, pageSize: limit }, // ✅ Added
+            pagination: { pageIndex: page, pageSize: limit },
           }}
           manualPagination
           rowCount={data?.meta.total ?? 0}
-          onPaginationChange={handlePaginationChange} // ✅ Fixed handler
+          onPaginationChange={handlePaginationChange}
           enableToolbarInternalActions={false}
           onRowSelectionChange={handleRowSelectionChange}
           enableMultiRowSelection={false}
@@ -450,20 +446,32 @@ export default function CompaniesPage() {
         </Toast.Root>
         <Toast.Viewport className="fixed top-4 right-4 w-96 max-w-full outline-none" />
 
-        {/* Confirm Delete Dialog */}
+        {/* Confirm Dialog */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
-            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
+            <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50">
               <Dialog.Title className="text-lg font-bold">
-                Confirm Delete
+                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Restore"}
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                Are you sure you want to permanently delete{" "}
-                <span className="font-semibold">
-                  {selectedCompany?.name ?? ""}
-                </span>
-                ? This action cannot be undone.
+                {dialogAction === "delete" ? (
+                  <>
+                    Are you sure you want to delete{" "}
+                    <span className="font-semibold">
+                      {selectedCompany?.name ?? ""}
+                    </span>
+                    ? The company can be restored later.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to restore{" "}
+                    <span className="font-semibold">
+                      {selectedCompany?.name ?? ""}
+                    </span>
+                    ?
+                  </>
+                )}
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -473,10 +481,13 @@ export default function CompaniesPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+                  onClick={confirmAction}
+                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                    }`}
                 >
-                  Delete
+                  {dialogAction === "delete" ? "Delete" : "Restore"}
                 </button>
               </div>
             </Dialog.Content>

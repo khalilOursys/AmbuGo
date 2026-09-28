@@ -135,6 +135,7 @@ export default function UsersPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"delete" | "restore">("delete");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -187,6 +188,13 @@ export default function UsersPage() {
 
   const handleDelete = (user: User) => {
     setSelectedUser(user);
+    setDialogAction("delete");
+    setDialogOpen(true);
+  };
+
+  const handleRestore = (user: User) => {
+    setSelectedUser(user);
+    setDialogAction("restore");
     setDialogOpen(true);
   };
 
@@ -194,35 +202,31 @@ export default function UsersPage() {
     if (!selectedUser) return;
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/soft-delete`,
-        { method: "PATCH" }
-      );
+      const url =
+        dialogAction === "delete"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/soft-delete`
+          : `${process.env.NEXT_PUBLIC_API_URL}/users/${selectedUser.id}/restore`;
 
+      const res = await fetch(url, { method: "PATCH" });
       if (!res.ok) throw new Error("Action failed");
 
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      showToast(`✅ User ${selectedUser.email} deleted`, "success");
+      showToast(
+        dialogAction === "delete"
+          ? `✅ User ${selectedUser.email} deleted`
+          : `✅ User ${selectedUser.email} restored`,
+        "success"
+      );
     } catch (err) {
-      showToast(`❌ Failed to delete user`, "error");
+      showToast(
+        dialogAction === "delete"
+          ? "❌ Failed to delete user"
+          : "❌ Failed to restore user",
+        "error"
+      );
     } finally {
       setDialogOpen(false);
       setSelectedUser(null);
-    }
-  };
-
-  const handleRestore = async (user: User) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/${user.id}/restore`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Restore failed");
-
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      showToast(`✅ User ${user.email} restored`, "success");
-    } catch (err) {
-      showToast("❌ Failed to restore user", "error");
     }
   };
 
@@ -320,9 +324,24 @@ export default function UsersPage() {
       },
     },
     {
+      accessorKey: "isDeleted",
+      header: "Status",
+      size: 90,
+      Cell: ({ cell }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs ${cell.getValue()
+            ? "bg-red-100 text-red-800"
+            : "bg-green-100 text-green-800"
+            }`}
+        >
+          {cell.getValue() ? "Deleted" : "Active"}
+        </span>
+      ),
+    },
+    {
       id: "actions",
       header: "Actions",
-      size: 300,
+      size: 320,
       Cell: ({ row }) => (
         <div className="flex gap-1 flex-wrap">
           <button
@@ -504,17 +523,29 @@ export default function UsersPage() {
         {/* Confirm Dialog */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
-            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
+            <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50">
               <Dialog.Title className="text-lg font-bold">
-                Confirm Delete
+                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Restore"}
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                Are you sure you want to delete user{" "}
-                <span className="font-semibold">
-                  {selectedUser?.email ?? ""}
-                </span>
-                ? The user can be restored later.
+                {dialogAction === "delete" ? (
+                  <>
+                    Are you sure you want to delete user{" "}
+                    <span className="font-semibold">
+                      {selectedUser?.email ?? ""}
+                    </span>
+                    ? The user can be restored later.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to restore user{" "}
+                    <span className="font-semibold">
+                      {selectedUser?.email ?? ""}
+                    </span>
+                    ?
+                  </>
+                )}
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -525,9 +556,12 @@ export default function UsersPage() {
                 </button>
                 <button
                   onClick={confirmAction}
-                  className="px-4 py-2 rounded-md text-white bg-red-500 hover:bg-red-600"
+                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                    }`}
                 >
-                  Delete
+                  {dialogAction === "delete" ? "Delete" : "Restore"}
                 </button>
               </div>
             </Dialog.Content>

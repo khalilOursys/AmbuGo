@@ -97,7 +97,6 @@ export default function VehiclesPage() {
     const params = useParams();
     const queryClient = useQueryClient();
 
-    // Get companyId from route params
     const companyId = params.companyId as string;
 
     const [page, setPage] = useState(0);
@@ -116,8 +115,8 @@ export default function VehiclesPage() {
     const [toastType, setToastType] = useState<"success" | "error">("success");
 
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogAction, setDialogAction] = useState<"delete" | "restore">("delete");
     const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-    const [dialogAction, setDialogAction] = useState<"delete" | "soft-delete" | "restore">("delete");
 
     const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -163,12 +162,6 @@ export default function VehiclesPage() {
         setDialogOpen(true);
     };
 
-    const handleSoftDelete = (vehicle: Vehicle) => {
-        setSelectedVehicle(vehicle);
-        setDialogAction("soft-delete");
-        setDialogOpen(true);
-    };
-
     const handleRestore = (vehicle: Vehicle) => {
         setSelectedVehicle(vehicle);
         setDialogAction("restore");
@@ -179,29 +172,28 @@ export default function VehiclesPage() {
         if (!selectedVehicle) return;
 
         try {
-            let url = `${process.env.NEXT_PUBLIC_API_URL}/vehicles/${selectedVehicle.id}`;
-            let method = "DELETE";
-            let successMsg = "";
+            const url =
+                dialogAction === "delete"
+                    ? `${process.env.NEXT_PUBLIC_API_URL}/vehicles/${selectedVehicle.id}/soft-delete`
+                    : `${process.env.NEXT_PUBLIC_API_URL}/vehicles/${selectedVehicle.id}/restore`;
 
-            if (dialogAction === "soft-delete") {
-                url = `${url}/soft-delete`;
-                method = "PATCH";
-                successMsg = `✅ Vehicle ${selectedVehicle.registration} soft deleted`;
-            } else if (dialogAction === "restore") {
-                url = `${url}/restore`;
-                method = "PATCH";
-                successMsg = `✅ Vehicle ${selectedVehicle.registration} restored`;
-            } else {
-                successMsg = `✅ Vehicle ${selectedVehicle.registration} permanently deleted`;
-            }
-
-            const res = await fetch(url, { method });
+            const res = await fetch(url, { method: "PATCH" });
             if (!res.ok) throw new Error("Action failed");
 
             queryClient.invalidateQueries({ queryKey: ["vehicles", companyId] });
-            showToast(successMsg, "success");
+            showToast(
+                dialogAction === "delete"
+                    ? `✅ Vehicle ${selectedVehicle.registration} deleted`
+                    : `✅ Vehicle ${selectedVehicle.registration} restored`,
+                "success"
+            );
         } catch (err) {
-            showToast(`❌ Failed to ${dialogAction} vehicle`, "error");
+            showToast(
+                dialogAction === "delete"
+                    ? "❌ Failed to delete vehicle"
+                    : "❌ Failed to restore vehicle",
+                "error"
+            );
         } finally {
             setDialogOpen(false);
             setSelectedVehicle(null);
@@ -338,7 +330,7 @@ export default function VehiclesPage() {
         {
             id: "actions",
             header: "Actions",
-            size: 250,
+            size: 280,
             Cell: ({ row }) => (
                 <div className="flex gap-1 flex-wrap">
                     <button
@@ -354,12 +346,6 @@ export default function VehiclesPage() {
                                 onClick={() => handleEdit(row.original)}
                             >
                                 Edit
-                            </button>
-                            <button
-                                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
-                                onClick={() => handleSoftDelete(row.original)}
-                            >
-                                Soft Delete
                             </button>
                             <button
                                 className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
@@ -532,37 +518,27 @@ export default function VehiclesPage() {
 
                 <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
                     <Dialog.Portal>
-                        <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
-                        <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
+                        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+                        <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50">
                             <Dialog.Title className="text-lg font-bold">
-                                {dialogAction === "restore" ? "Restore Vehicle" :
-                                    dialogAction === "soft-delete" ? "Soft Delete Vehicle" :
-                                        "Confirm Delete"}
+                                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Restore"}
                             </Dialog.Title>
                             <Dialog.Description className="mt-2 text-gray-600">
-                                {dialogAction === "restore" ? (
+                                {dialogAction === "delete" ? (
+                                    <>
+                                        Are you sure you want to delete{" "}
+                                        <span className="font-semibold">
+                                            {selectedVehicle?.registration ?? ""}
+                                        </span>
+                                        ? The vehicle can be restored later.
+                                    </>
+                                ) : (
                                     <>
                                         Are you sure you want to restore{" "}
                                         <span className="font-semibold">
                                             {selectedVehicle?.registration ?? ""}
                                         </span>
                                         ?
-                                    </>
-                                ) : dialogAction === "soft-delete" ? (
-                                    <>
-                                        Are you sure you want to soft delete{" "}
-                                        <span className="font-semibold">
-                                            {selectedVehicle?.registration ?? ""}
-                                        </span>
-                                        ? This can be restored later.
-                                    </>
-                                ) : (
-                                    <>
-                                        Are you sure you want to permanently delete{" "}
-                                        <span className="font-semibold">
-                                            {selectedVehicle?.registration ?? ""}
-                                        </span>
-                                        ? This action cannot be undone.
                                     </>
                                 )}
                             </Dialog.Description>
@@ -575,16 +551,12 @@ export default function VehiclesPage() {
                                 </button>
                                 <button
                                     onClick={confirmAction}
-                                    className={`px-4 py-2 rounded-md text-white ${dialogAction === "restore"
-                                        ? "bg-green-500 hover:bg-green-600"
-                                        : dialogAction === "soft-delete"
-                                            ? "bg-orange-500 hover:bg-orange-600"
-                                            : "bg-red-500 hover:bg-red-600"
+                                    className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete"
+                                        ? "bg-red-500 hover:bg-red-600"
+                                        : "bg-green-500 hover:bg-green-600"
                                         }`}
                                 >
-                                    {dialogAction === "restore" ? "Restore" :
-                                        dialogAction === "soft-delete" ? "Soft Delete" :
-                                            "Delete"}
+                                    {dialogAction === "delete" ? "Delete" : "Restore"}
                                 </button>
                             </div>
                         </Dialog.Content>

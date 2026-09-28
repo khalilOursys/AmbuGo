@@ -58,6 +58,7 @@ const fetchPatients = async ({
   address,
   birthDateFrom,
   birthDateTo,
+  isDeleted,
 }: {
   page: number;
   limit: number;
@@ -70,6 +71,7 @@ const fetchPatients = async ({
   address?: string;
   birthDateFrom?: string;
   birthDateTo?: string;
+  isDeleted?: boolean;
 }): Promise<PaginatedResponse<Patient>> => {
   const params = new URLSearchParams();
   params.append("page", (page + 1).toString());
@@ -83,6 +85,7 @@ const fetchPatients = async ({
   if (address) params.append("address", address);
   if (birthDateFrom) params.append("birthDateFrom", birthDateFrom);
   if (birthDateTo) params.append("birthDateTo", birthDateTo);
+  if (isDeleted !== undefined) params.append("isDeleted", isDeleted.toString());
 
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/patients?${params.toString()}`
@@ -109,6 +112,7 @@ export default function PatientsPage() {
     address: "",
     birthDateFrom: "",
     birthDateTo: "",
+    isDeleted: false,
   });
 
   const [toastOpen, setToastOpen] = useState(false);
@@ -116,6 +120,7 @@ export default function PatientsPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"delete" | "restore">("delete");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -140,78 +145,56 @@ export default function PatientsPage() {
         address: filters.address || undefined,
         birthDateFrom: filters.birthDateFrom || undefined,
         birthDateTo: filters.birthDateTo || undefined,
+        isDeleted: filters.isDeleted,
       }),
     placeholderData: keepPreviousData,
     enabled: !!companyId,
   });
 
   const handleAdd = () => router.push(`/patients/${companyId}/add`);
+  const handleView = (p: Patient) => router.push(`/patients/${companyId}/view/${p.id}`);
   const handleEdit = (p: Patient) =>
     router.push(`/patients/${companyId}/edit/${p.id}`);
 
   const handleDelete = (p: Patient) => {
     setSelectedPatient(p);
+    setDialogAction("delete");
     setDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const handleRestore = (p: Patient) => {
+    setSelectedPatient(p);
+    setDialogAction("restore");
+    setDialogOpen(true);
+  };
+
+  const confirmAction = async () => {
     if (!selectedPatient) return;
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/patients/${selectedPatient.id}`,
-        { method: "DELETE" }
-      );
+      const url =
+        dialogAction === "delete"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/patients/${selectedPatient.id}/soft-delete`
+          : `${process.env.NEXT_PUBLIC_API_URL}/patients/${selectedPatient.id}/restore`;
+
+      const res = await fetch(url, { method: "PATCH" });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || "Delete failed");
+        throw new Error(err.message || "Action failed");
       }
       queryClient.invalidateQueries({ queryKey: ["patients"] });
+
+      const fullName = `${selectedPatient.firstname} ${selectedPatient.lastname}`;
       showToast(
-        `✅ Patient ${selectedPatient.firstname} ${selectedPatient.lastname} deleted`,
+        dialogAction === "delete"
+          ? `✅ Patient ${fullName} deleted`
+          : `✅ Patient ${fullName} restored`,
         "success"
       );
     } catch (err: any) {
-      showToast(`❌ ${err.message || "Failed to delete"}`, "error");
+      showToast(`❌ ${err.message || "Action failed"}`, "error");
     } finally {
       setDialogOpen(false);
       setSelectedPatient(null);
-    }
-  };
-
-  const handleSoftDelete = async (p: Patient) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/patients/${p.id}/soft-delete`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Soft delete failed");
-      }
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      showToast(
-        `✅ Patient ${p.firstname} ${p.lastname} soft deleted`,
-        "success"
-      );
-    } catch (err: any) {
-      showToast(`❌ ${err.message}`, "error");
-    }
-  };
-
-  const handleRestore = async (p: Patient) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/patients/${p.id}/restore`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Restore failed");
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      showToast(
-        `✅ Patient ${p.firstname} ${p.lastname} restored`,
-        "success"
-      );
-    } catch (err) {
-      showToast("❌ Failed to restore patient", "error");
     }
   };
 
@@ -230,6 +213,7 @@ export default function PatientsPage() {
       address: "",
       birthDateFrom: "",
       birthDateTo: "",
+      isDeleted: false,
     });
     setPage(0);
   };
@@ -312,8 +296,8 @@ export default function PatientsPage() {
       Cell: ({ cell }) => (
         <span
           className={`px-2 py-1 rounded-full text-xs ${cell.getValue()
-              ? "bg-red-100 text-red-800"
-              : "bg-green-100 text-green-800"
+            ? "bg-red-100 text-red-800"
+            : "bg-green-100 text-green-800"
             }`}
         >
           {cell.getValue() ? "Deleted" : "Active"}
@@ -323,9 +307,15 @@ export default function PatientsPage() {
     {
       id: "actions",
       header: "Actions",
-      size: 280,
+      size: 320,
       Cell: ({ row }) => (
         <div className="flex gap-1 flex-wrap">
+          <button
+            className="px-2 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600"
+            onClick={() => handleView(row.original)}
+          >
+            View
+          </button>
           <button
             className="px-2 py-1 bg-yellow-500 text-white rounded-md text-xs hover:bg-yellow-600"
             onClick={() => handleEdit(row.original)}
@@ -340,20 +330,12 @@ export default function PatientsPage() {
               Restore
             </button>
           ) : (
-            <>
-              <button
-                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
-                onClick={() => handleSoftDelete(row.original)}
-              >
-                Soft Delete
-              </button>
-              <button
-                className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
-                onClick={() => handleDelete(row.original)}
-              >
-                Delete
-              </button>
-            </>
+            <button
+              className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
+              onClick={() => handleDelete(row.original)}
+            >
+              Delete
+            </button>
           )}
         </div>
       ),
@@ -381,7 +363,7 @@ export default function PatientsPage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-9 gap-3">
           <input
             type="text"
             placeholder="Search..."
@@ -434,6 +416,16 @@ export default function PatientsPage() {
             onChange={(e) => handleFilterChange("birthDateFrom", e.target.value)}
             className="px-3 py-2 border rounded-md text-sm"
           />
+          <select
+            value={filters.isDeleted.toString()}
+            onChange={(e) =>
+              handleFilterChange("isDeleted", e.target.value === "true")
+            }
+            className="px-3 py-2 border rounded-md text-sm"
+          >
+            <option value="false">Active Only</option>
+            <option value="true">Deleted Only</option>
+          </select>
           <button
             onClick={handleClearFilters}
             className="px-3 py-2 bg-gray-500 text-white rounded-md text-sm hover:bg-gray-600"
@@ -491,17 +483,29 @@ export default function PatientsPage() {
 
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
-            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
+            <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50">
               <Dialog.Title className="text-lg font-bold">
-                Confirm Delete
+                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Restore"}
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                Are you sure you want to permanently delete{" "}
-                <span className="font-semibold">
-                  {selectedPatient?.firstname} {selectedPatient?.lastname}
-                </span>
-                ? This action cannot be undone.
+                {dialogAction === "delete" ? (
+                  <>
+                    Are you sure you want to delete{" "}
+                    <span className="font-semibold">
+                      {selectedPatient?.firstname} {selectedPatient?.lastname}
+                    </span>
+                    ? The patient can be restored later.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to restore{" "}
+                    <span className="font-semibold">
+                      {selectedPatient?.firstname} {selectedPatient?.lastname}
+                    </span>
+                    ?
+                  </>
+                )}
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -511,10 +515,13 @@ export default function PatientsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+                  onClick={confirmAction}
+                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                    }`}
                 >
-                  Delete
+                  {dialogAction === "delete" ? "Delete" : "Restore"}
                 </button>
               </div>
             </Dialog.Content>
