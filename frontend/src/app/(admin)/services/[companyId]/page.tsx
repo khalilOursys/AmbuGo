@@ -91,7 +91,6 @@ export default function ServicesPage() {
   const params = useParams();
   const queryClient = useQueryClient();
 
-  // Get companyId from route params
   const companyId = params.companyId as string;
 
   const [page, setPage] = useState(0);
@@ -109,6 +108,7 @@ export default function ServicesPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState<"delete" | "restore">("delete");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -133,7 +133,7 @@ export default function ServicesPage() {
         isDeleted: filters.isDeleted,
       }),
     placeholderData: keepPreviousData,
-    enabled: !!companyId, // Only run query if companyId exists
+    enabled: !!companyId,
   });
 
   const handleAdd = () => {
@@ -148,58 +148,47 @@ export default function ServicesPage() {
     router.push(`/services/${companyId}/view/${service.id}`);
   };
 
-  const handleDelete = async (service: Service) => {
+  const handleDelete = (service: Service) => {
     setSelectedService(service);
+    setDialogAction("delete");
     setDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const handleRestore = (service: Service) => {
+    setSelectedService(service);
+    setDialogAction("restore");
+    setDialogOpen(true);
+  };
+
+  const confirmAction = async () => {
     if (!selectedService) return;
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/services/${selectedService.id}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) throw new Error("Delete failed");
+      const url =
+        dialogAction === "delete"
+          ? `${process.env.NEXT_PUBLIC_API_URL}/services/${selectedService.id}/soft-delete`
+          : `${process.env.NEXT_PUBLIC_API_URL}/services/${selectedService.id}/restore`;
+
+      const res = await fetch(url, { method: "PATCH" });
+      if (!res.ok) throw new Error("Action failed");
 
       queryClient.invalidateQueries({ queryKey: ["services"] });
-      showToast(`✅ Service ${selectedService.name} deleted`, "success");
+      showToast(
+        dialogAction === "delete"
+          ? `✅ Service ${selectedService.name} deleted`
+          : `✅ Service ${selectedService.name} restored`,
+        "success"
+      );
     } catch (err) {
-      showToast("❌ Failed to delete service", "error");
+      showToast(
+        dialogAction === "delete"
+          ? "❌ Failed to delete service"
+          : "❌ Failed to restore service",
+        "error"
+      );
     } finally {
       setDialogOpen(false);
       setSelectedService(null);
-    }
-  };
-
-  const handleSoftDelete = async (service: Service) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/services/${service.id}/soft-delete`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Soft delete failed");
-
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      showToast(`✅ Service ${service.name} soft deleted`, "success");
-    } catch (err) {
-      showToast("❌ Failed to soft delete service", "error");
-    }
-  };
-
-  const handleRestore = async (service: Service) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/services/${service.id}/restore`,
-        { method: "PATCH" }
-      );
-      if (!res.ok) throw new Error("Restore failed");
-
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      showToast(`✅ Service ${service.name} restored`, "success");
-    } catch (err) {
-      showToast("❌ Failed to restore service", "error");
     }
   };
 
@@ -292,7 +281,7 @@ export default function ServicesPage() {
     {
       id: "actions",
       header: "Actions",
-      size: 250,
+      size: 280,
       Cell: ({ row }) => (
         <div className="flex gap-1 flex-wrap">
           <button
@@ -315,20 +304,12 @@ export default function ServicesPage() {
               Restore
             </button>
           ) : (
-            <>
-              <button
-                className="px-2 py-1 bg-orange-500 text-white rounded-md text-xs hover:bg-orange-600"
-                onClick={() => handleSoftDelete(row.original)}
-              >
-                Soft Delete
-              </button>
-              <button
-                className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
-                onClick={() => handleDelete(row.original)}
-              >
-                Delete
-              </button>
-            </>
+            <button
+              className="px-2 py-1 bg-red-500 text-white rounded-md text-xs hover:bg-red-600"
+              onClick={() => handleDelete(row.original)}
+            >
+              Delete
+            </button>
           )}
         </div>
       ),
@@ -452,20 +433,32 @@ export default function ServicesPage() {
         </Toast.Root>
         <Toast.Viewport className="fixed top-4 right-4 w-96 max-w-full outline-none" />
 
-        {/* Confirm Delete Dialog */}
+        {/* Confirm Dialog */}
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50" />
-            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-lg z-50">
+            <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 w-96 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50">
               <Dialog.Title className="text-lg font-bold">
-                Confirm Delete
+                {dialogAction === "delete" ? "Confirm Delete" : "Confirm Restore"}
               </Dialog.Title>
               <Dialog.Description className="mt-2 text-gray-600">
-                Are you sure you want to permanently delete{" "}
-                <span className="font-semibold">
-                  {selectedService?.name ?? ""}
-                </span>
-                ? This action cannot be undone.
+                {dialogAction === "delete" ? (
+                  <>
+                    Are you sure you want to delete{" "}
+                    <span className="font-semibold">
+                      {selectedService?.name ?? ""}
+                    </span>
+                    ? The service can be restored later.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to restore{" "}
+                    <span className="font-semibold">
+                      {selectedService?.name ?? ""}
+                    </span>
+                    ?
+                  </>
+                )}
               </Dialog.Description>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -475,10 +468,13 @@ export default function ServicesPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+                  onClick={confirmAction}
+                  className={`px-4 py-2 rounded-md text-white ${dialogAction === "delete"
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                    }`}
                 >
-                  Delete
+                  {dialogAction === "delete" ? "Delete" : "Restore"}
                 </button>
               </div>
             </Dialog.Content>
