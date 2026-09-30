@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
-import { ArrowLeft, Save, Edit } from "lucide-react";
+import { ArrowLeft, Save, Edit, MapPin } from "lucide-react";
+import LocationMapPicker from "@/components/LocationMapPicker";
 
 interface Patient {
   id: string;
@@ -14,6 +15,8 @@ interface Patient {
   phone: string | null;
   gender: string | null;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   notes: string | null;
   companyId: string | null;
 }
@@ -25,6 +28,8 @@ interface UpdatePatientDto {
   phone?: string;
   gender?: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
   notes?: string;
 }
 
@@ -72,6 +77,8 @@ export default function EditPatientPage() {
     phone: "",
     gender: "",
     address: "",
+    latitude: undefined,
+    longitude: undefined,
     notes: "",
   });
 
@@ -97,12 +104,12 @@ export default function EditPatientPage() {
       setFormData({
         firstname: patient.firstname,
         lastname: patient.lastname,
-        birthDate: patient.birthDate
-          ? patient.birthDate.split("T")[0]
-          : "",
+        birthDate: patient.birthDate ? patient.birthDate.split("T")[0] : "",
         phone: patient.phone || "",
         gender: patient.gender || "",
         address: patient.address || "",
+        latitude: patient.latitude ?? undefined,
+        longitude: patient.longitude ?? undefined,
         notes: patient.notes || "",
       });
     }
@@ -145,6 +152,14 @@ export default function EditPatientPage() {
       gender: formData.gender || undefined,
       address: formData.address || undefined,
       notes: formData.notes || undefined,
+      latitude:
+        formData.latitude !== undefined && !isNaN(formData.latitude)
+          ? Number(formData.latitude)
+          : undefined,
+      longitude:
+        formData.longitude !== undefined && !isNaN(formData.longitude)
+          ? Number(formData.longitude)
+          : undefined,
     };
 
     updateMutation.mutate({ id: patientId, data: payload });
@@ -189,6 +204,7 @@ export default function EditPatientPage() {
           <form onSubmit={submitForm}>
             <div className="p-6.5">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {/* First Name */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     First Name <span className="text-danger">*</span>
@@ -204,6 +220,7 @@ export default function EditPatientPage() {
                   />
                 </div>
 
+                {/* Last Name */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Last Name <span className="text-danger">*</span>
@@ -219,6 +236,7 @@ export default function EditPatientPage() {
                   />
                 </div>
 
+                {/* Birth Date */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Birth Date
@@ -233,6 +251,7 @@ export default function EditPatientPage() {
                   />
                 </div>
 
+                {/* Gender */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Gender
@@ -251,6 +270,7 @@ export default function EditPatientPage() {
                   </select>
                 </div>
 
+                {/* Phone */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Phone
@@ -265,6 +285,7 @@ export default function EditPatientPage() {
                   />
                 </div>
 
+                {/* Address */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Address
@@ -279,6 +300,67 @@ export default function EditPatientPage() {
                   />
                 </div>
 
+                {/* ---------------- MAP PICKER ---------------- */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 flex items-center gap-2 text-sm font-medium text-black dark:text-white">
+                    <MapPin className="h-4 w-4" />
+                    Location on Map
+                  </label>
+
+                  <LocationMapPicker
+                    latitude={formData.latitude}
+                    longitude={formData.longitude}
+                    onChange={({ latitude, longitude }) =>
+                      setFormData((prev) => ({ ...prev, latitude, longitude }))
+                    }
+                    height={350}
+                  />
+
+                  {/* Manual fallback inputs */}
+                  <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Latitude
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.latitude ?? ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            latitude: e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          })
+                        }
+                        className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-4 py-2 text-sm outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Longitude
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.longitude ?? ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            longitude: e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          })
+                        }
+                        className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-4 py-2 text-sm outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {/* ---------------- /MAP PICKER ---------------- */}
+
+                {/* Notes */}
                 <div className="md:col-span-2">
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Notes

@@ -608,11 +608,11 @@ export class MissionService {
       },
     });
 
-    if (activeAssignments > 0) {
+    /* if (activeAssignments > 0) {
       throw new BadRequestException(
         'Cannot delete mission with active assignments.',
       );
-    }
+    } */
 
     return await this.prisma.mission.update({
       where: { id },

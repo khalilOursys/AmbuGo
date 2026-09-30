@@ -765,11 +765,11 @@ export class VehiclesService {
       },
     });
 
-    if (activeAssignments) {
+    /* if (activeAssignments) {
       throw new BadRequestException(
         'Cannot delete vehicle that is assigned to an active mission.',
       );
-    }
+    } */
 
     return await this.prisma.vehicle.update({
       where: { id },

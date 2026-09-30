@@ -438,11 +438,11 @@ export class StaffService {
       },
     });
 
-    if (activeAssignments > 0) {
+    /* if (activeAssignments > 0) {
       throw new BadRequestException(
         'Cannot delete staff member with active assignments.',
       );
-    }
+    } */
 
     return await this.prisma.staffMember.update({
       where: { id },
