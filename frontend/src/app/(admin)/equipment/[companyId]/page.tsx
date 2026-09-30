@@ -172,7 +172,7 @@ export default function EquipmentPage() {
   };
 
   const handleView = (equipment: Equipment) => {
-    router.push(`/equipment/view/${companyId}/${equipment.id}`);
+    router.push(`/equipment/${companyId}/view/${equipment.id}`);
   };
 
   const handleDelete = (equipment: Equipment) => {
