@@ -179,7 +179,7 @@ export default function UsersPage() {
   };
 
   const handleView = (user: User) => {
-    router.push(`/users/${user.id}`);
+    router.push(`/users/view/${user.id}`);
   };
 
   const handlePermissions = (user: User) => {
