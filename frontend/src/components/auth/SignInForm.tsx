@@ -31,13 +31,13 @@ export default function SignInForm() {
     try {
       const data = await login({ email, password });
       setUser(data.user); // fill context
-      //TODO : change it to profile page
-      router.push("/");
-      /* if (data.user.companyId) {
-        router.push(`/companies/${data.user.companyId}`);
+      /* router.push("/"); */
+      if (data.user.companyId) {
+        //router.push(`/companies/${data.user.companyId}`);
+        router.push(`/profile`);
       } else {
         router.push("/");
-      } */
+      }
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {

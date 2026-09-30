@@ -59,10 +59,19 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+
 enum PricingType {
   FIXED
-  PER_KM
-  DISTANCE_RANGE
+  HOURLY
+  DISTANCE
+  CUSTOM
+}
+
+enum CompanyStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
 }
 
 enum AmbulanceLevel {
@@ -113,52 +122,82 @@ enum LocationType {
 }
 
 // ===================== COMPANY =====================
+
 model Company {
   id               String @id @default(uuid())
 
-  name             String @unique
-
-  address          String?
-
-  latitude         Float?
-  longitude        Float?
-
-  radiusKm         Float @default(10)
-
-  pricingType      PricingType @default(FIXED)
-
-  baseCurrency     String @default("TND")
-
-  rib              String?
-  matriculeFiscale String?
+  name             String
+  slug             String?
+  legalName        String?
 
   email            String?
   phone            String?
+  fax              String?
+  website          String?
 
-  logoId           String? @unique
-  logo             File? @relation(fields: [logoId], references: [id])
+  address          String?
+  city             String?
+  postalCode       String?
+  country          String? @default("TN")
+  latitude         Float?
+  longitude        Float?
+  radiusKm         Float   @default(10)
 
-  users            User[]
-  services         Service[]
-  equipment        Equipment[]
-  distanceRates    DistanceRate[]
-  customers        Customer[]
-  vehicles         Vehicle[]
-  staff            StaffMember[]
-  shiftTemplates   ShiftTemplate[]
-  patients         Patient[]
-  locations        Location[]
-  contracts        Contract[]
-  missions         Mission[]
+  matriculeFiscale String?
+  rib              String?
+  iban             String?
+  bankName         String?
+  vatRate          Float   @default(0)
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt @default(now())
+  pricingType         PricingType @default(FIXED)
+  baseCurrency        String      @default("TND")
+  defaultPaymentTerms Int?        @default(30)
+  invoicePrefix       String?     @default("INV-")
 
-  isDeleted        Boolean @default(false)
-  deletedAt        DateTime?
+  status              CompanyStatus @default(ACTIVE)
+  plan                String?       @default("free")
+  trialEndsAt         DateTime?
+  subscriptionEndsAt  DateTime?
+  onboardingCompleted Boolean       @default(false)
+  verifiedAt          DateTime?
+
+  timezone String @default("Africa/Tunis")
+  locale   String @default("fr-TN")
+  settings Json?  @default("{}")
+
+  // Logo (1-1) — FK lives on File
+  logo File? @relation("CompanyLogo")
+
+  users          User[]
+  services       Service[]
+  equipment      Equipment[]
+  distanceRates  DistanceRate[]
+  customers      Customer[]
+  vehicles       Vehicle[]
+  staff          StaffMember[]
+  shiftTemplates ShiftTemplate[]
+  patients       Patient[]
+  locations      Location[]
+  contracts      Contract[]
+  missions       Mission[]
+
+  createdById String?
+  updatedById String?
+  deletedById String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   @@index([name])
+  @@index([slug])
+  @@index([email])
+  @@index([phone])
+  @@index([matriculeFiscale])
+  @@index([status])
   @@index([isDeleted])
+  @@index([createdAt])
 }
 
 // ===================== USERS =====================
@@ -902,18 +941,18 @@ model AuditLog {
   @@index([createdAt])
 }
 
-// ===================== FILE =====================
+// ===================== FILE ===================== 
 model File {
-  id        String @id @default(uuid())
+  id       String @id @default(uuid())
 
-  filename  String
-  mimeType  String
-  size      Int
-  path      String
-  url       String
+  filename String
+  mimeType String
+  size     Int
+  path     String
+  url      String
 
-  company   Company? @relation()
-  companyId String? @unique
+  company   Company? @relation("CompanyLogo", fields: [companyId], references: [id], onDelete: SetNull)
+  companyId String?  @unique
 
   createdAt DateTime @default(now())
 

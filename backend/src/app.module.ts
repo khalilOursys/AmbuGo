@@ -12,9 +12,23 @@ import { StaffModule } from './staff/staff.module';
 import { LocationModule } from './location/location.module';
 import { PatientModule } from './patient/patient.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { CompanySettingsModule } from './company-settings/company-settings.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, CompaniesModule, ServicesModule, EquipmentModule, VehiclesModule, MissionModule, StaffModule, LocationModule, PatientModule, PermissionsModule],
+  imports: [
+    AuthModule,
+    CompanySettingsModule,
+    UsersModule,
+    CompaniesModule,
+    ServicesModule,
+    EquipmentModule,
+    VehiclesModule,
+    MissionModule,
+    StaffModule,
+    LocationModule,
+    PatientModule,
+    PermissionsModule,
+  ],
   controllers: [AppController],
   providers: [PrismaService],
 })

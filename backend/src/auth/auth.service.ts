@@ -67,7 +67,7 @@ export class AuthService {
     }
 
     // Check if company name already exists
-    const existingCompany = await this.prisma.company.findUnique({
+    const existingCompany = await this.prisma.company.findFirst({
       where: { name: companyData.name },
     });
 

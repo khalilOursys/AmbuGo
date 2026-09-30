@@ -16,7 +16,7 @@ export class CompaniesService {
 
   // No explicit return type - TypeScript infers it
   async create(createCompanyDto: CreateCompanyDto) {
-    const existing = await this.prisma.company.findUnique({
+    const existing = await this.prisma.company.findFirst({
       where: { name: createCompanyDto.name },
     });
 
@@ -152,7 +152,7 @@ export class CompaniesService {
           matriculeFiscale: true,
           email: true,
           phone: true,
-          logoId: true,
+          logo: true,
           createdAt: true,
           updatedAt: true,
           isDeleted: true,
@@ -233,7 +233,7 @@ export class CompaniesService {
     await this.findOne(id);
 
     if (updateCompanyDto.name) {
-      const existing = await this.prisma.company.findUnique({
+      const existing = await this.prisma.company.findFirst({
         where: { name: updateCompanyDto.name },
       });
 
