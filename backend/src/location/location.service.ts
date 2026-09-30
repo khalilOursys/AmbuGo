@@ -261,11 +261,11 @@ export class LocationService {
       },
     });
 
-    if (activeMissions > 0) {
+    /* if (activeMissions > 0) {
       throw new BadRequestException(
         'Cannot delete location with active missions.',
       );
-    }
+    } */
 
     return await this.prisma.location.update({
       where: { id },

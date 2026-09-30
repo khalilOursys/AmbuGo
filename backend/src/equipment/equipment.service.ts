@@ -319,11 +319,11 @@ export class EquipmentService {
       },
     });
 
-    if (vehicleUsage > 0 || missionUsage > 0) {
+    /* if (vehicleUsage > 0 || missionUsage > 0) {
       throw new BadRequestException(
         'Cannot delete equipment that is currently in use.',
       );
-    }
+    } */
 
     return await this.prisma.equipment.update({
       where: { id },

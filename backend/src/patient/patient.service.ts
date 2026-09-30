@@ -379,11 +379,11 @@ export class PatientService {
       },
     });
 
-    if (activeMissions > 0) {
+    /* if (activeMissions > 0) {
       throw new BadRequestException(
         'Cannot delete patient with active missions.',
       );
-    }
+    } */
 
     return await this.prisma.patient.update({
       where: { id },

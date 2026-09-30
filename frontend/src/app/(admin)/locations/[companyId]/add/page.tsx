@@ -1,27 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Toast from "@radix-ui/react-toast";
-import { ArrowLeft, Save, Edit } from "lucide-react";
+import { ArrowLeft, Save, Plus, MapPin } from "lucide-react";
+import LocationMapPicker from "@/components/LocationMapPicker";
+import { useMapPicker } from "@/hooks/useMapPicker";
 
-interface Location {
-  id: string;
+interface CreateLocationDto {
+  companyId?: string;
   name: string;
-  type: string;
-  phone: string | null;
-  address: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  website: string | null;
-  email: string | null;
-  notes: string | null;
-  companyId: string | null;
-}
-
-interface UpdateLocationDto {
-  name?: string;
   type?: string;
   phone?: string;
   address?: string;
@@ -32,44 +21,30 @@ interface UpdateLocationDto {
   notes?: string;
 }
 
-const fetchLocation = async (id: string): Promise<Location> => {
+const createLocation = async (data: CreateLocationDto) => {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/locations/${id}`
-  );
-  if (!response.ok) throw new Error("Failed to fetch location");
-  return response.json();
-};
-
-const updateLocation = async ({
-  id,
-  data,
-}: {
-  id: string;
-  data: UpdateLocationDto;
-}) => {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/locations/${id}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/locations`,
     {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }
   );
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.message || "Failed to update location");
+    throw new Error(error.message || "Failed to create location");
   }
   return response.json();
 };
 
-export default function EditLocationPage() {
+export default function AddLocationPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
   const companyId = params.companyId as string;
-  const locationId = params.id as string;
 
-  const [formData, setFormData] = useState<UpdateLocationDto>({
+  const [formData, setFormData] = useState<CreateLocationDto>({
+    companyId,
     name: "",
     type: "HOSPITAL",
     phone: "",
@@ -80,6 +55,11 @@ export default function EditLocationPage() {
     email: "",
     notes: "",
   });
+
+  const { latitude, longitude, handleMapChange } = useMapPicker(
+    formData,
+    setFormData
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
@@ -92,38 +72,15 @@ export default function EditLocationPage() {
     setToastOpen(true);
   };
 
-  const { data: location, isLoading: isLoadingLocation } = useQuery({
-    queryKey: ["location", locationId],
-    queryFn: () => fetchLocation(locationId),
-    enabled: !!locationId,
-  });
-
-  useEffect(() => {
-    if (location) {
-      setFormData({
-        name: location.name,
-        type: location.type,
-        phone: location.phone || "",
-        address: location.address || "",
-        latitude: location.latitude ?? undefined,
-        longitude: location.longitude ?? undefined,
-        website: location.website || "",
-        email: location.email || "",
-        notes: location.notes || "",
-      });
-    }
-  }, [location]);
-
-  const updateMutation = useMutation({
-    mutationFn: updateLocation,
+  const createMutation = useMutation({
+    mutationFn: createLocation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["locations"] });
-      queryClient.invalidateQueries({ queryKey: ["location", locationId] });
-      showToast("✅ Location updated successfully", "success");
+      showToast("✅ Location created successfully", "success");
       setTimeout(() => router.push(`/locations/${companyId}`), 1500);
     },
     onError: (error: Error) => {
-      showToast(`❌ ${error.message}`, "error");
+      showToast(`❌ ${error.message || "Connection problem"}`, "error");
     },
     onSettled: () => setIsSubmitting(false),
   });
@@ -138,7 +95,7 @@ export default function EditLocationPage() {
       return;
     }
 
-    const payload: UpdateLocationDto = {
+    const payload: CreateLocationDto = {
       ...formData,
       phone: formData.phone || undefined,
       address: formData.address || undefined,
@@ -155,20 +112,10 @@ export default function EditLocationPage() {
           : undefined,
     };
 
-    updateMutation.mutate({ id: locationId, data: payload });
+    createMutation.mutate(payload);
   };
 
   const handleCancel = () => router.push(`/locations/${companyId}`);
-
-  if (isLoadingLocation) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Toast.Provider>
@@ -186,8 +133,8 @@ export default function EditLocationPage() {
         <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
           <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
             <h3 className="text-xl font-semibold text-black dark:text-white flex items-center gap-2">
-              <Edit className="w-6 h-6" />
-              Edit Location
+              <Plus className="w-6 h-6" />
+              Add New Location
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Company ID: {companyId}
@@ -197,6 +144,7 @@ export default function EditLocationPage() {
           <form onSubmit={submitForm}>
             <div className="p-6.5">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {/* Name */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Name <span className="text-danger">*</span>
@@ -209,9 +157,11 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, name: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Central Hospital"
                   />
                 </div>
 
+                {/* Type */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Type
@@ -233,6 +183,7 @@ export default function EditLocationPage() {
                   </select>
                 </div>
 
+                {/* Phone */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Phone
@@ -244,9 +195,11 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, phone: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="+21612345678"
                   />
                 </div>
 
+                {/* Email */}
                 <div>
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Email
@@ -258,9 +211,11 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, email: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="contact@hospital.tn"
                   />
                 </div>
 
+                {/* Address */}
                 <div className="md:col-span-2">
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Address
@@ -272,49 +227,71 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, address: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="123 Main Street, Tunis"
                   />
                 </div>
 
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Latitude
+                {/* ---------------- MAP PICKER ---------------- */}
+                <div className="md:col-span-2">
+                  <label className="mb-3 flex items-center gap-2 text-sm font-medium text-black dark:text-white">
+                    <MapPin className="h-4 w-4" />
+                    Location on Map
                   </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.latitude ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        latitude: e.target.value
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                  />
-                </div>
 
-                <div>
-                  <label className="mb-3 block text-sm font-medium text-black dark:text-white">
-                    Longitude
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.longitude ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        longitude: e.target.value
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  <LocationMapPicker
+                    latitude={latitude}
+                    longitude={longitude}
+                    onChange={handleMapChange}
+                    height={350}
                   />
-                </div>
 
+                  {/* Manual fallback inputs */}
+                  <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Latitude
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.latitude ?? ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            latitude: e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          })
+                        }
+                        className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-4 py-2 text-sm outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                        placeholder="36.8065"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Longitude
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.longitude ?? ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            longitude: e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          })
+                        }
+                        className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-4 py-2 text-sm outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                        placeholder="10.1815"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {/* ---------------- /MAP PICKER ---------------- */}
+
+                {/* Website */}
                 <div className="md:col-span-2">
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Website
@@ -326,9 +303,11 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, website: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="https://hospital.tn"
                   />
                 </div>
 
+                {/* Notes */}
                 <div className="md:col-span-2">
                   <label className="mb-3 block text-sm font-medium text-black dark:text-white">
                     Notes
@@ -339,6 +318,7 @@ export default function EditLocationPage() {
                       setFormData({ ...formData, notes: e.target.value })
                     }
                     className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    placeholder="Additional notes..."
                     rows={3}
                   />
                 </div>
@@ -360,12 +340,12 @@ export default function EditLocationPage() {
                   {isSubmitting ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                      Updating...
+                      Saving...
                     </>
                   ) : (
                     <>
                       <Save className="w-5 h-5" />
-                      Update Location
+                      Save Location
                     </>
                   )}
                 </button>
